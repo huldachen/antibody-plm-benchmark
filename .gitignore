@@ -1,0 +1,36 @@
+# Data files (large)
+data/raw/*.csv
+data/raw/*.tsv
+data/raw/*.xlsx
+data/raw/*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Environments
+.env
+*.env
+env/
+venv/
+.conda/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Model caches (large)
+models/cache/
+*.pt
+*.bin
