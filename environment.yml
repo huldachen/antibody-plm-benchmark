@@ -1,0 +1,22 @@
+name: ab-plm-bench
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - jupyter
+  - biopython
+  - pip:
+    - anarci
+    - ablang
+    - antiberty
+    - fair-esm
+    - transformers
+    - torch

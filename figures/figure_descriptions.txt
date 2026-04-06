@@ -1,0 +1,75 @@
+Figure Descriptions — Antibody PLM Benchmark
+=============================================
+
+Figure 1. Dataset Characterization
+-----------------------------------
+A 2×4 panel (Row 1: Mason, Row 2: Absci) showing the structure of both
+datasets. For each dataset: (A/E) mutation count distribution, (B/F) fitness
+distribution (Mason = log-enrichment from FACS sort; Absci = -log(Kd) from
+SPR), (C/G) class balance between binders and non-binders, and (D/H) summary
+statistics table. Mason (green) is a 500-variant subsample of a 36k
+combinatorial CDR-H3 library with binary FACS readout on a 10-residue loop.
+Absci (blue) contains 1,266 same-length variants with quantitative SPR Kd on a
+13-residue CDR-H3. The two datasets differ in assay resolution (binary vs
+continuous), library size, and mutation load, making them complementary
+benchmarks.
+
+Figure 2. Binder Classification — AUC-ROC with 95% Bootstrap CI
+-----------------------------------------------------------------
+Grouped bar chart comparing AUC-ROC across five scoring methods: a trivial
+mutation-count baseline (number of mutations as negative score), BLOSUM62,
+ESM-2, AbLang, and AntiBERTy. Error bars are 95% confidence intervals from
+2,000 bootstrap resamples. The mutation-count baseline (highlighted in orange)
+reveals the dominant confound: on Mason it achieves AUC = 0.750, exceeding all
+PLMs. On Absci, BLOSUM62 (AUC ≈ 0.69) is the only model that clearly beats
+the mutation-count baseline (AUC = 0.634). This figure establishes that most
+apparent model performance on combinatorial CDR-H3 libraries is explained by a
+trivial feature — fewer mutations from the parental sequence correlates with
+binding.
+
+Figure 3. Score vs. Mutation Count — Confound Analysis
+-------------------------------------------------------
+2×4 scatter panel (Row 1: Mason, Row 2: Absci) plotting each model's score
+against mutation count, with points colored by binder status (dark = binder,
+light = non-binder). Spearman ρ and significance are shown in each panel title.
+All four scorers show strong negative correlation with mutation count — higher
+mutation count produces lower scores. This is expected for additive scoring
+methods (BLOSUM62 sums per-position scores; PLMs sum per-position log-
+likelihoods), where each additional mutation adds a predominantly negative
+term. The key observation is that binders (dark points) cluster at lower
+mutation counts, so any scorer that is sensitive to mutation count will
+trivially separate binders from non-binders without learning genuine fitness
+determinants.
+
+Figure 4. Raw vs. Partial Correlation (controlling for mutation count)
+-----------------------------------------------------------------------
+Dumbbell chart showing, for each model × dataset combination, the raw Spearman
+ρ (filled circle) and the partial Spearman ρ after controlling for mutation
+count (open diamond). The connecting line visualizes how much of the raw
+correlation was attributable to the mutation-count confound. Positive values
+mean the model score tracks fitness; negative values mean the model anti-
+predicts (higher score → worse variant). For Mason (green, n=500): all models
+shrink toward zero after partialling out mutation count. AbLang drops from
++0.119 to +0.045; ESM-2 flips sign. For Absci (blue, binders only n=420): all
+partial ρ values are near zero or negative. ESM-2 goes from −0.054 to −0.101,
+indicating genuine anti-prediction — it penalizes the CDR-H3 diversity that
+functional antibodies require. This is the central finding: after removing the
+trivial mutation-count confound, no model significantly predicts continuous
+fitness on either dataset. Note: Absci uses binders only because non-binders
+lack measured Kd values.
+
+Figure 5. Inter-Model Agreement (Pairwise Spearman Correlation)
+-----------------------------------------------------------------
+Side-by-side heatmaps showing pairwise Spearman ρ between model scores on
+Mason (green colormap, n=500) and Absci (blue colormap, n=1,266). The key
+finding is that AbLang and AntiBERTy are highly redundant (ρ = 0.80 on Mason,
+0.88 on Absci) — both were trained on the Observed Antibody Space (OAS)
+database and learn nearly identical representations. BLOSUM62 is the most
+independent scorer (ρ = 0.28–0.39 with other models), reflecting its
+fundamentally different basis: evolutionary substitution statistics vs. learned
+contextual embeddings. ESM-2 sits in between (ρ = 0.53–0.69 with antibody
+PLMs), sharing some evolutionary signal but lacking antibody-specific training.
+The high AbLang–AntiBERTy redundancy explains why ensembling antibody PLMs
+provides no benefit: they carry the same information. BLOSUM62's independence
+is precisely why it is the only scorer that adds signal beyond mutation count —
+it captures position-specific substitution tolerance that the PLMs do not.
