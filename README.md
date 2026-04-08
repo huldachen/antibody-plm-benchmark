@@ -4,6 +4,8 @@
 
 A systematic benchmark of antibody-specific PLMs (AbLang, AntiBERTy) vs. a general-purpose PLM (ESM-2) vs. BLOSUM62 for variant fitness prediction on combinatorial CDR-H3 libraries.
 
+> **Full analysis narrative:** [`notebooks/lab_notebook.md`](notebooks/lab_notebook.md) — 15 entries covering dataset selection, scorer validation, statistical deep-dive, literature comparison, and interpretation of every result below.
+
 <p align="center">
   <img src="figures/fig2_auc_comparison.png" width="700" alt="AUC-ROC comparison across models and datasets">
 </p>
@@ -88,7 +90,7 @@ Detailed figure interpretations are in [`figures/figure_descriptions.txt`](figur
 
 ```bash
 # Clone and set up environment
-git clone https://github.com/YOUR_USERNAME/antibody-plm-benchmark.git
+git clone https://github.com/huldachen/antibody-plm-benchmark.git
 cd antibody-plm-benchmark
 conda env create -f environment.yml
 conda activate ab-plm-bench
@@ -144,6 +146,14 @@ Related work:
 - Notin et al. (2023) — ProteinGym benchmark (predominantly single-point DMS)
 - AbMAP (PNAS 2025) — Antibody embedding benchmarks, similar limitations in combinatorial regimes
 - Kenlay et al. (PLoS Comp Bio 2025) — Nucleotide-level context models for antibody engineering
+
+## Limitations & Future Work
+
+**CDR vs. framework stratification.** The original hypothesis was that PLMs would underperform in CDRs (shaped by VDJ recombination, not phylogenetic evolution) but retain value in conserved framework regions. Both datasets here contain only CDR-H3 mutations, so this comparison was not testable. The stratification module (`evaluation/stratify.py`) is implemented and ready for datasets with framework mutations (e.g., Warszawski et al.). This remains the most interesting open question.
+
+**Mason subsample size.** Mason results use a 500-variant subsample of the full 36k library. Full-dataset BLOSUM analysis confirmed the signal (partial ρ = +0.069, p < 0.001 on 36k), but running all four PLMs on the full set would strengthen the conclusions.
+
+**Single antibody target.** Both datasets target HER2 via trastuzumab variants. Generalization to other targets and antibody scaffolds is unknown.
 
 ## License
 
