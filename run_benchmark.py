@@ -474,6 +474,24 @@ def main():
     # Save
     save_results(df, results_df, score_cols, args.dataset, cfg)
 
+    # v2 metric suite (AUPRC, F1, Kendall tau, Precision@K, MutCount baseline).
+    # Runs against the just-saved scored CSV — no re-scoring needed.
+    try:
+        from reevaluate import (
+            add_mutcount_column, evaluate_all, print_table,
+            DATASETS as V2_DATASETS,
+        )
+        v2_cfg = V2_DATASETS[args.dataset]
+        df_v2 = add_mutcount_column(df, v2_cfg["mutation_col"])
+        beat_parent = v2_cfg.get("wt_fitness") is not None
+        v2_results = evaluate_all(df_v2, v2_cfg, beat_parent=beat_parent)
+        print_table(v2_results, v2_cfg, beat_parent=beat_parent)
+        v2_path = os.path.join(RESULTS_DIR, f"{args.dataset}_v2_metrics.csv")
+        v2_results.to_csv(v2_path, index=False)
+        print(f"v2 metrics saved: {v2_path}")
+    except Exception as e:
+        print(f"\n[warn] v2 reevaluation failed: {e}")
+
     print("\n" + "=" * 60)
     print("Benchmark complete.")
     if len(args.models) == 1 and args.models[0] == "blosum":

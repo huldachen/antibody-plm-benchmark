@@ -1,7 +1,7 @@
 # Antibody PLM Benchmark — Lab Notebook
 
 **Project**: Systematic benchmark of antibody-specific vs. general protein language models for variant fitness prediction
-**PI**: Hulda Chen
+**Maintainer**: huldachen
 **Start Date**: 2026-04-03
 
 ---
@@ -737,9 +737,236 @@ antibody-plm-benchmark/
 
 ---
 
+## Entry 16 — v2 Metric Suite: Responding to LinkedIn Feedback (2026-04-23)
+
+### Motivation
+
+After posting v1 on LinkedIn, three separate reviewers raised substantive methodological points. Rather than rewrite v1 or defend it, I treated the v1 release as a durable artefact (the scored-variant CSVs in `results/`) and added a metric layer on top of it via a new `reevaluate.py` script — which recomputes metrics from the saved scores without re-running any PLM.
+
+This is a deliberate design choice: separating scoring (expensive, GPU) from evaluation (cheap, CPU) means future metric additions are ~seconds of work, not hours. It also makes the "iteration" story explicit — the reader can see v1 vs. v2 results side-by-side in the same repo.
+
+### The three pieces of feedback
+
+**1. Class imbalance + lab-workflow metrics.** Prevalence is 30.8% (Mason) and 33.2% (Absci) — AUC-ROC is not obviously broken, but AUPRC is a more honest imbalance-aware metric. More importantly, the reviewer pointed out that **lab discovery does not care about ranking position 50,000 vs. 60,000** — what matters is precision at the top of the list (pick top 30, how many are binders?). He also predicted P@K would expose MutCount's tie problem, since all 1-mutation variants receive identical rank. And he flagged a deeper point: "we don't want binders worse than the parent" — a binder is not useful if it's worse than what the lab already has.
+
+**2. Masked-marginal scoring is theoretically wrong for multi-mutation variants.** Each position is scored independently given all other positions are already mutated, which is inconsistent when many positions are jointly changed. An autoregressive PLM (chain-rule factorization) is more principled. Also requested: Kendall τ and top-percentage ranking metrics.
+
+**3. BLOSUM-PLM correlation is industry-normal; PLMs add value in generation, not ranking.** This reviewer works in the field and does this analysis on every project. 70–80% correlation between BLOSUM and PLMs is typical across molecule classes, and even state-of-the-art PLMs often correlate 90+% with older ones — revealing redundancy in training data. The real question is "good enough or maximum accuracy," and the real PLM value is **generative** design (plausible single-mutation proposals, paired-chain design, humanization), not ranking accuracy. This reframes my v1 conclusion: "PLMs ≈ BLOSUM for ranking combinatorial CDR-H3" is a fair statement; "PLMs are useless" is not.
+
+### Prioritization
+
+Decided to ship #1 first because:
+- Metric additions are cheap (hours, not days).
+- They apply to the existing scored CSVs with no re-scoring.
+- They genuinely test whether v1's conclusions hold up under a different evaluation lens.
+
+#2 (autoregressive scoring) and the framing from #3 are deferred to v3, alongside the KyDab dataset integration.
+
+### What was added
+
+In `evaluation/metrics.py`:
+- `auprc` — `sklearn.average_precision_score` wrapper.
+- `best_f1` — sweep thresholds, return max F1 plus the corresponding precision/recall and prevalence. Reporting prevalence alongside F1 is important because the "always predict positive" baseline equals prevalence.
+- `kendall_tau` — tau-b, which handles tied ranks correctly. Expected to track Spearman closely under most conditions, but sanity-checking this is worth one function call.
+- `precision_at_k(scores, labels, k, n_tiebreaks=20)` — top-K precision, with K as int (e.g., 30) or float (e.g., 0.05 for top-5%). Crucially, it handles ties explicitly: adds tiny uniform noise to break ties randomly, runs 20 independent shuffles, and reports the mean. Also returns `n_ties` at the K-th boundary as a diagnostic — so a reader can tell when the P@K number is tiebreak-dependent rather than intrinsic to the ranking.
+- `precision_at_k_beat_reference` — same as P@K but the "positive" label is redefined as "fitness > reference_fitness". Used for beat-parent analysis.
+
+In `reevaluate.py` (new script):
+- Loads `results/<dataset>_all_scored.csv`.
+- Synthesises a `MutCount_score` column (= −NumMutations) so the mutation-count baseline is treated as a first-class model in the table, directly comparable.
+- Computes the full v2 metric suite per model and prints a wide table.
+- For Absci, uses the known parental Kd (1.94 nM, neg_log_Kd = 8.712) to compute beat-parent P@K.
+- Saves a `<dataset>_v2_metrics.csv` alongside the scored CSV.
+
+`run_benchmark.py` now calls `reevaluate.py`'s evaluation at the end of each run, so the v2 table is produced automatically for new scoring runs. Scoring and evaluation remain cleanly separated, though.
+
+### The v2 metrics, explained
+
+Each of the five metrics in the v2 suite was chosen for a specific reason — either to test whether a v1 conclusion holds under a different evaluation lens, or to measure something v1 literally could not measure. Writing this out explicitly is worth the space because the whole point of v2 is that the *choice of metric* changes the story.
+
+**1. AUPRC — Area Under the Precision–Recall Curve.**
+
+*What it is.* For every possible score threshold, compute precision (TP / (TP+FP)) and recall (TP / (TP+FN)), then take the area under the resulting precision-vs-recall curve. Equivalently, it's the average of the precision at each rank where a true positive sits, over all true positives — a precision integral that ignores true negatives entirely.
+
+*How we compute it.* `sklearn.metrics.average_precision_score(labels, scores)` — which implements the rank-based formulation `AP = Σ_k (R_k − R_{k−1}) · P_k`, a staircase integral that is exact for finite data. We wrap it with NaN masking in `auprc()`.
+
+*Why it matters here.* AUC-ROC is symmetric in positive and negative classes and can be misleadingly high on imbalanced data — a model that looks "decent" by AUC can still be bad at retrieving the minority class specifically. Both datasets here are imbalanced in the *typical* direction (31–33% positives), but the lab-discovery use case is even more lopsided: the practitioner cares almost exclusively about the top-ranked positives, and AUPRC weights them heavily. The random-retrieval baseline for AUPRC is the positive prevalence itself (~0.31 for Mason, ~0.33 for Absci), which gives a concrete null floor. A model with AUPRC at prevalence is literally no better than random picking.
+
+*What it told us.* AUPRC tracks AUC-ROC qualitatively — MutCount wins on Mason (0.536 vs prevalence 0.308), BLOSUM62 wins on Absci (0.493 vs prevalence 0.332), and every PLM is close to or below prevalence. The "PLMs ≈ random retrieval" result survives the switch to an imbalance-aware metric.
+
+**2. Best F1 — the theoretical-best operating point.**
+
+*What it is.* F1 = 2·Precision·Recall / (Precision + Recall), the harmonic mean of precision and recall at a specific decision threshold. "Best F1" is the maximum F1 over all thresholds.
+
+*How we compute it.* Sort scores descending; at each rank k, TP_k = Σ labels[:k], FP_k = k − TP_k; compute precision and recall at each rank; compute F1 at each rank; return the max along with its threshold, precision, recall, and the overall positive rate. We return `pos_rate` alongside because it is the F1 of the trivial "always predict positive" classifier (pos_rate = 2·prevalence / (1+prevalence) in the limit — actually F1 in that case equals 2·p/(1+p), which is noticeably higher than p itself; for prevalence 0.33 the always-positive F1 is 0.50).
+
+*Why it matters here.* AUC/AUPRC are threshold-free. Best F1 reports a single-point summary of "what's the best you could do if you tuned the cutoff?" and — because F1 weights precision and recall equally — penalises both "predicts almost nothing positive" and "predicts everything positive." Pairing Best F1 with prevalence lets a reader see whether a model is actually better than the always-positive trivial baseline.
+
+*What it told us.* Best F1 values cluster around 0.48–0.59 on both datasets, not far above the always-positive baseline of ~0.50 (Mason) / 0.50 (Absci). This is consistent with the AUC/AUPRC picture — no model produces a clearly separating threshold.
+
+**3. Kendall tau-b — tie-aware rank correlation.**
+
+*What it is.* Kendall's τ counts concordant pairs (where the predicted and true orderings agree) minus discordant pairs, normalised. τ-b further adjusts the denominator for ties in either variable, which matters when many variants share a score (e.g., MutCount).
+
+*How we compute it.* `scipy.stats.kendalltau(predicted, observed, variant='b')`.
+
+*Why it matters here.* Spearman ρ operationally ranks the data and computes Pearson r on the ranks. If a small number of very-high-fitness outliers happen to also be top-predicted, Spearman can be inflated — because a handful of rank pairs carry most of the signal. Kendall τ weights every pairwise comparison equally, so it is more conservative for heavy-tailed data and more honest under ties. A Kendall that is ≪ Spearman in magnitude is a flag that the correlation is outlier-driven.
+
+*What it told us.* Kendall τ tracks Spearman ρ with the same sign in every case, at roughly 2/3 the magnitude — the expected ratio under a smoothly monotone relationship. There is no case where Spearman looked meaningful and Kendall exposed it as outlier-driven. This is a negative result, but a valuable one: the v1 Spearman correlations (both the "PLMs barely correlate with fitness" findings and the ESM-2 anti-prediction on Absci) are not statistical artefacts of a few extreme points.
+
+**4. Precision@K — the lab-workflow metric.**
+
+*What it is.* Of the top-K variants ranked by the model, what fraction are true positives? P@K = (# positives in top K) / K. We report K = 30, 100, and top-5% of the dataset, plus a `n_ties_at_boundary` diagnostic (how many variants share the K-th score — the larger this is, the more the P@K number depends on tiebreaks).
+
+*How we compute it.* Sort scores descending, take top K, compute positive fraction. Ties are broken by adding uniform noise of magnitude 1e-9 and re-sorting. We repeat 20 times with different random seeds and report mean, min, and max. The tiny noise is small enough that it never disturbs strict inequalities but forces tied scores to be randomly ordered within the tied group.
+
+*Why this is the metric that matters.* A real discovery campaign has finite wet-lab capacity. If a scientist can synthesise and assay 30 variants from a predicted ranking, the only thing that matters is the hit rate among those 30. AUC-ROC treats rank 50,000 vs. 60,000 the same as rank 30 vs. 31, which is irrelevant to actual decision-making. P@K is the bridge between a model's prediction and a lab's budget.
+
+The tie diagnostic is crucial for MutCount. Because MutCount only takes integer values, it necessarily produces ties. On Mason, 32 variants share the K=30 boundary score; on Absci, 14 do. Without the tiebreak-averaging and the reported `n_ties` count, a naïve implementation would pick an arbitrary 30 variants from the tied set and report a P@30 that depends on the sort stability of the underlying library — which is not science.
+
+*What it told us.* On Absci, MutCount P@30 = 0.853 — the highest lab-workflow number in the whole benchmark. But the 14 ties at the boundary mean the number is partly tiebreak-inflated. On Mason, MutCount P@30 = 0.682 with 32 ties. PLMs have only 1 tie (continuous scores), so their numbers are honest. BLOSUM62 has small integer-like jumps and 9–14 ties. This asymmetry in tie behaviour is itself informative: models with discrete score spaces need tie-aware evaluation, and without it they can look better than they are.
+
+**5. Beat-parent Precision@K + improver-rank diagnostic — did we improve on the starting antibody?**
+
+*What it is.* Same mechanic as P@K, but positives are redefined: `label = (fitness > reference_fitness)`, where `reference_fitness` is the parental antibody's measured fitness. On Absci, the parental trastuzumab HCDR3 has Kd = 1.94 nM (neg_log_Kd ≈ 8.7122), and only **5 of 1266 variants** strictly improve on it (5 of 420 binders, ~1.2% base rate among binders). With n=5 improvers, P@30 alone is noisy, so we also report a **median-rank + Mann-Whitney** diagnostic: for each model, the ranks (1 = best) of all 5 improvers, their median, and a one-sided Mann-Whitney U test asking whether the improvers' ranks are systematically higher (worse) or lower (better) than the 1261 non-improvers' ranks.
+
+*How we compute it.* `precision_at_k_beat_reference(scores, fitness, reference_fitness, k)` for P@K; `improver_rank_diagnostic(df, cfg, wt_fitness)` in `reevaluate.py` for the rank summary. The WT fitness is looked up at runtime from the `NumMutations == 0` row rather than hard-coded, to avoid rounding bugs (see next subsection).
+
+*Why this is the honest discovery metric.* Binder/non-binder classification is not discovery; it's a filter. A scientist with a working lead antibody does not need another binder at Kd = 100 nM — they need one that is *better* than their current best. Beat-parent P@K tests exactly that: among your top-30 picks, how many are genuine improvers? With only 5 improvers, though, the P@30 number has intrinsic granularity of 1/30 ≈ 0.033, and four of the five "0.000" results are indistinguishable from the noise floor. Median rank is the more discriminating summary.
+
+*What it told us.* On Absci, with WT fitness = 8.7121982701 (looked up, not rounded):
+
+| Model | P@30 beat-WT | Improver ranks (out of 1266) | Median rank | MW p (anti) | MW p (enrich) |
+|---|---|---|---|---|---|
+| MutCount  | 0.067 (2/30) | 3, 4, 447, 448, 713       |  447 | 0.972 | **0.028** |
+| BLOSUM62  | 0.000 (0/30) | 111, 174, 237, 784, 863    |  237 | 0.886 | 0.114 |
+| ESM-2     | 0.000 (0/30) | 597, 747, 945, 963, 1113   |  945 | 0.073 | 0.927 |
+| AbLang    | 0.000 (0/30) | 606, 913, 959, 975, 1204   |  959 | **0.034** | 0.967 |
+| AntiBERTy | 0.000 (0/30) | 113, 460, 1106, 1158, 1178 | 1106 | 0.155 | 0.846 |
+
+The null-hypothesis median rank under random scoring is 633 (half of 1266). A model that enriches improvers has median rank ≪ 633 with a small `MW p (enrich)`; a model that anti-predicts improvers has median rank ≫ 633 with a small `MW p (anti)`.
+
+Reading across the table:
+- **MutCount significantly enriches improvers (p = 0.028).** Median rank 447 < 633; two of the five land in the top-4. The mutation-count distance heuristic really does carry information about who improves on the parent.
+- **BLOSUM62 trends toward enrichment (p = 0.114).** Median rank 237, but with only 5 improvers the test is underpowered.
+- **ESM-2 trends toward anti-prediction (p = 0.073).** Median rank 945 > 633; four of five improvers in the bottom half.
+- **AbLang significantly anti-predicts improvers (p = 0.034).** Median rank 959; improvers consistently in the bottom half. This is the cleanest statistical signal in the v2 suite.
+- **AntiBERTy anti-predicts but not significantly (p = 0.155).** Median rank 1106 — numerically the worst — but the one "rank 113" outlier blunts the test.
+
+This transforms the v1 qualitative claim "PLMs ≈ BLOSUM on Absci, maybe a bit negative" into a graded, testable v2 claim: **antibody-specific PLMs rank improver variants below the average variant in the dataset**. Combined with v1's finding that ESM-2 has a negative partial-ρ on Absci after controlling for mutation count, this is consistent evidence that current PLMs penalize the hypervariability that improved CDR-H3 binders actually exploit.
+
+Binary-classification metrics (AUC ~0.55–0.68, AUPRC ~0.37–0.49, F1 ~0.51–0.55) entirely hid this effect. They measure "can you distinguish binders from non-binders?" — to which the answer is "a little" — while the improver analysis measures "can you distinguish *improvers* from the rest?" — to which the PLM answer is "yes, but with the wrong sign."
+
+### Verifying the beat-parent claim (and fixing a bug in the process)
+
+The strong "zero improvers in top 30" statement from the first draft of this entry was worth double-checking, and the check found two real problems.
+
+**Problem 1 (my error): I wrote "14 of 420 binders beat the parent."** The actual number is **5 of 420**. I had the 14 from memory, not from computation, and did not verify before writing it in the notebook. Fixed.
+
+**Problem 2 (code bug): a hard-coded rounded WT fitness inflated MutCount's P@30_beatWT from 0.067 to 0.100.** The actual parental neg_log_Kd is `8.712198270069774`. I stored it as `8.712198` in `reevaluate.py`'s dataset config. Because my comparison was strict `>`, the WT row itself (fitness `8.712198270069774`) counted as "beating" the rounded threshold `8.712198` — so MutCount's top-30 (which always contains WT at rank 1) picked up one phantom improver, giving 3/30 = 0.100 instead of the true 2/30 = 0.067.
+
+The fix was to replace the hard-coded constant with a runtime lookup against the `NumMutations == 0` row of the loaded DataFrame:
+
+```python
+"wt_fitness": "lookup:NumMutations==0"
+```
+
+— resolved by `resolve_wt_fitness()` in `reevaluate.py`. This removes the floating-point footgun entirely: the threshold is always the exact value sitting in the data.
+
+**What the verification added.** Aside from catching the two errors, the check motivated the `improver_rank_diagnostic` function. With only 5 improvers, P@30 has a granularity of 1/30 and most models bottom out at 0.000 — the metric cannot distinguish "slightly below random" from "strongly anti-predictive." The Mann-Whitney test uses every non-improver rank (n = 1261) for comparison, which is why it surfaces the graded signal.
+
+**Lesson filed for future iterations.** Both errors share a root cause: I wrote a striking claim before producing it from code. The verification took ~5 minutes and changed the finding from "all zero, feels weak" to "AbLang significantly anti-predicts improvers, p = 0.034." Numbers in the notebook should come from a script that is checked into the repo; prose claims that are not backed by a reproducible computation should be flagged as such.
+
+### Summary of why each metric was added
+
+| Metric | Addresses | New information relative to v1 |
+|---|---|---|
+| AUPRC | Class imbalance ("does it hold up?") | Imbalance-aware check — confirms v1 AUC story. |
+| Best F1 | "What's the best operating point?" | Threshold-aware; interpretable vs. always-positive baseline. |
+| Kendall τ | Spearman robustness to outliers | v1 Spearman correlations are not outlier artefacts. |
+| Precision@K | Lab workflow reality | MutCount's dominance on Absci (P@30 = 0.853) is partly tie-inflated; PLMs are cleaner but weaker. |
+| Beat-parent P@K + improver-rank diagnostic | "Are we finding *improvers*, not just binders?" | **MutCount significantly enriches improvers (p=0.028); AbLang significantly anti-predicts them (p=0.034); ESM-2 trends anti-predictive (p=0.073).** A graded failure mode invisible to AUC/AUPRC/F1. |
+
+### Interpretation: why the antibody-specific PLMs underperformed — OAS germline bias
+
+A natural follow-up question after seeing the improver-rank table: *why* do AbLang and AntiBERTy — explicitly antibody-trained models — rank improvers so poorly, in some cases worse than the general-purpose ESM-2? This is not an unpublished observation; the AbLang authors themselves have written about it. The short version: the training distribution (Observed Antibody Space) is dominated by naive / germline-close B-cell receptor sequences, so the models learn "likely antibody" ≈ "germline antibody" — and the improver variants in Absci are the opposite of germline.
+
+**Quantifying the bias — Olsen et al., *Bioinformatics* 2024 (the [AbLang-2 paper](https://academic.oup.com/bioinformatics/article/40/11/btae618/7845256)).** Measured directly on clonotype data:
+
+| Model | Predicts germline at non-germline positions | Cumulative probability for valid non-germline residues (heavy chain) |
+|---|---|---|
+| Sapiens   | 87.6% | — |
+| AntiBERTy | 86.7% | < 2% |
+| AbLang-1  | 84.9% | < 2% |
+
+The paper also reports the training-data composition: **OAS is 42% naive B-cells + 39% unsorted B-cells** — overwhelmingly germline-close sequences with minimal somatic hypermutation. Therapeutic antibodies typically carry 11–20 non-germline mutations outside CDR3; the Absci variants we score have 6–13 CDR-H3 mutations against a parent (trastuzumab) that is itself heavily engineered. So AbLang-1 is evaluating sequences that are far out of its training distribution, and its prior — "sequences look like germline" — is exactly opposite to "sequences are improved engineered binders."
+
+**AbLang-2 was published specifically to address this.** It uses focal loss and paired-chain training to push non-germline cumulative probability up from ~2% to ~14–15%. *But* the paper explicitly notes that AbLang-2 is **"less informative for variants involving CDR3 changes"** — precisely our benchmark setting. So the germline-bias fix is not expected to fully close the gap on Mason/Absci.
+
+**Kenlay et al., *PLoS Comp Bio* 2025 ([paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC12262217/))** went further: a small CNN (a few thousand parameters) trained on antibody *nucleotide* sequences outperforms multi-million-parameter protein PLMs (AbLang2, ESM-1v) on antibody affinity maturation prediction. The mechanistic argument is that **somatic hypermutation is nucleotide-driven** (AID enzyme has sequence-context biases), and amino-acid-level models fundamentally cannot access that signal. They also showed ESM-1v is miscalibrated: it overestimates substitution rates at highly-mutable sites and underestimates at conserved ones.
+
+**Integrating with feedback #3.** The "PLMs ≈ BLOSUM, their value is generative" reframing from LinkedIn feedback is the same observation from a different angle. Both BLOSUM (evolutionary substitution prior) and antibody PLMs (naive-repertoire prior) encode "what's evolutionarily typical" — and that prior is systematically wrong for engineered binders that were *selected against* the typical distribution. The failure is not that the models are bad at language modeling; it's that the thing they're modeling (natural antibody distribution) is not the thing the benchmark asks about (engineered binding fitness).
+
+**What version of AbLang did we actually run?** The installed package is `ablang` v0.3.1 — this is **AbLang-1**, the original version with the ~2% non-germline probability. AbLang-2 ships as a separate `ablang2` package and is not in our environment. So our result is explicitly a measurement of AbLang-1. A v3 experiment should add AbLang-2 as a fifth PLM scorer to isolate how much of the observed anti-prediction is germline bias (partially fixed by focal loss in AbLang-2) vs. structural-to-masked-marginal-CDR3-scoring (not fixed by any OAS-trained model). The AbLang-2 authors' own caveat predicts the gap will narrow but not close.
+
+**What this does and does not say.** It does say: given current antibody PLMs and masked-marginal scoring, ranking combinatorial CDR-H3 variants for *improvement over a mature therapeutic* is outside the regime where these models work. It does not say PLMs are useless — the literature documents their value for humanization, paired-chain completion, and generative proposals, none of which are tested here.
+
+### Key v2 findings
+
+**Class-imbalance metrics (AUPRC, F1) confirm v1.** AUPRC tracks AUC-ROC qualitatively — MutCount still wins on Mason, BLOSUM62 still wins on Absci. The feedback-1 question "does it hold up" has an answer: yes.
+
+**Precision@30 is a sharper lens than AUC-ROC.** On Mason:
+- MutCount P@30 = 0.682 (AUC = 0.750)
+- BLOSUM62 P@30 = 0.335 (AUC = 0.568)
+- PLMs P@30 = 0.37–0.47
+
+On Absci:
+- MutCount P@30 = **0.853** (AUC = 0.634) — the best lab-workflow number in the whole benchmark
+- BLOSUM62 P@30 = 0.667 (AUC = 0.683)
+- PLMs P@30 = 0.39–0.57
+
+The asymmetry between Mason and Absci under P@30 is striking. On Absci, MutCount's P@30 jumps to 85% because few-mutation variants (n_mut ≤ 2) are both rare AND almost always binders (the WT is itself included). On Mason the lowest mutation count is 4, so no such "trivially pick the WT" effect operates.
+
+**Tie diagnostic was worth building.** MutCount has 32 ties at the P@30 boundary on Mason and 14 on Absci — meaning the P@30 number is partly determined by random tiebreak. The PLMs have 1 tie each (essentially continuous scores), so their numbers are cleaner. Without the tie diagnostic, the MutCount P@K would look more impressive than it is.
+
+**Beat-parent analysis was the finding I didn't expect.** On Absci, only **5 of 420 binders** have Kd strictly better than the parent (1.94 nM) — a ~1.2% base rate among binders, ~0.4% of the full dataset. With n=5 improvers, P@30 has a granularity of 1/30 and most models bottom out at 0.000. The **Mann-Whitney test on improver ranks** is the more informative summary:
+
+| Model | P@30 beat-WT | Median improver rank (null = 633) | MW p (enrich) | MW p (anti-predict) |
+|---|---|---|---|---|
+| MutCount  | 0.067 (2/30) | 447 | **0.028** | 0.972 |
+| BLOSUM62  | 0.000        | 237 | 0.114     | 0.886 |
+| ESM-2     | 0.000        | 945 | 0.927     | 0.073 |
+| AbLang    | 0.000        | 959 | 0.967     | **0.034** |
+| AntiBERTy | 0.000        | 1106| 0.846     | 0.155 |
+
+The statistical picture is sharper than a pure zero-count: **MutCount significantly enriches for improvers, AbLang significantly anti-predicts them**, and the three PLMs all place improvers below the dataset median rank (633). This consolidates v1's finding that ESM-2 showed a negative partial-ρ on Absci — the same phenomenon seen through a different lens, across multiple PLMs. Binary classification metrics (AUC, AUPRC, F1) hide this entirely: a model can distinguish binders from non-binders while simultaneously ranking the *useful* binders (the improvers) below the *useless* ones.
+
+This concretely validates feedback-1's "we don't want binders worse than the parent" comment. A binary-classification benchmark is insufficient for variant discovery; the right metric is enrichment of *improvers*, not enrichment of binders.
+
+**Kendall τ tracks Spearman closely** as expected — no surprises. Useful as a robustness check; on Absci the sign agrees in every case, and magnitudes are within ~30% of the Spearman value (tau-b is naturally lower than Spearman in magnitude for monotone relationships).
+
+### Reframing v1 conclusions
+
+Feedback #3's reframing deserves explicit attention in the README because it changes the emphasis. The right statement is:
+
+> For *ranking* combinatorial CDR-H3 variants, PLMs provide negligible value beyond BLOSUM62 or mutation count. Their value in *generation* — proposing plausible single mutations, paired-chain design, humanization — is not tested here and is not refuted by these results.
+
+That's now in the Limitations section.
+
+### What v3 needs to do
+
+The remaining open items after v2:
+
+1. **Autoregressive PLM scoring** (addresses feedback #2). Masked-marginal factorization is wrong in theory for multi-mutation variants, and these datasets are *maximally* multi-mutation (median 6–8 simultaneous substitutions). Candidates: IgLM, p-IgGen, or a GPT-style model like ProGen2. Pick one, add a scorer in `models/`, rescore both datasets, reevaluate.
+2. **KyDab dataset integration**. 120K paired VH/VL sequences, 51 immunogens, natural-repertoire (not combinatorial from a single parent). Structurally different from Mason/Absci — no WT anchor — so requires a new scoring paradigm (whole-sequence pseudo-perplexity). Start narrow: pick one immunogen with clean binder/non-binder labels, treat it as dataset 3.
+
+v3 will need new figures and potentially a new baseline (mutation count doesn't apply to KyDab — different germlines, no parent). This is a bigger iteration than v2.
+
+---
+
 ## Status
 
-All analysis complete. All items below are DONE:
+### v1 (2026-04-03 → 2026-04-06) — COMPLETE
 
 1. ~~All model scorers validated~~ DONE
 2. ~~Full 4-model benchmark on Mason (500 subsample + bootstrap)~~ DONE
@@ -750,4 +977,20 @@ All analysis complete. All items below are DONE:
 7. ~~Full Absci 4-model definitive analysis~~ DONE
 8. ~~Generate comparison figures~~ DONE
 9. ~~Write up findings for GitHub README~~ DONE
-10. Future work: framework region analysis (original CDR vs framework hypothesis)
+
+### v2 (2026-04-23) — COMPLETE
+
+10. ~~Add AUPRC, best-F1, Kendall τ, Precision@K to `evaluation/metrics.py`~~ DONE
+11. ~~Build `reevaluate.py` to recompute metrics from scored CSVs without re-running PLMs~~ DONE
+12. ~~Treat MutCount as a first-class baseline in v2 tables~~ DONE
+13. ~~Beat-parent Precision@K on Absci using known parental Kd~~ DONE
+14. ~~Hook v2 metrics into `run_benchmark.py` end-of-run~~ DONE
+15. ~~Update README: Project Iterations section, v2 results tables, reframed Limitations~~ DONE
+
+### v3 (planned)
+
+16. **Add AbLang-2 scorer** (`pip install ablang2`). Same masked-marginal interface as AbLang-1. Isolates how much of the observed AbLang-1 anti-prediction is OAS germline bias (partially addressed by AbLang-2's focal loss) vs. structural-to-masked-marginal CDR3 scoring (unfixed). Olsen et al. 2024 predicts the gap will narrow but not close — worth measuring explicitly.
+17. Add autoregressive PLM scorer (IgLM or p-IgGen); rescore Mason + Absci; reevaluate. Addresses feedback #2.
+18. Integrate one KyDab immunogen as dataset 3; add whole-sequence pseudo-perplexity scorer (no-WT paradigm).
+19. Extend figures with v2/v3 findings (especially beat-parent P@K and cross-immunogen comparison).
+20. Original CDR-vs-framework hypothesis — still open, still waiting on a dataset with framework mutations.
