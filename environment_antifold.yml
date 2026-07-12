@@ -1,0 +1,20 @@
+# Isolated environment for the E4 structure arm (DEC-011).
+# AntiFold / ESM-IF pin numpy 1.26 + torch 2.3, which are INCOMPATIBLE with the
+# main analysis env (environment.yml: numpy 2.2 / scipy 1.15) and deadlock E1/E2
+# via an OpenMP conflict. Keep them in this separate env. Structure scoring here
+# writes score CSVs to results/; the improver-metric evaluation runs in the main
+# env on those CSVs (no cross-env imports).
+#
+# Create:  conda env create -f environment_antifold.yml
+# Use:     .../envs/antifold/bin/python structures/score_antifold_crystal.py
+name: antifold
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - antifold          # pulls torch 2.3.1, torch-geometric, biotite, numpy 1.26
+      - fair-esm          # for ESM-IF (esm.inverse_folding; may also need
+                          # torch-scatter/torch-sparse — install if the geometric
+                          # stack is needed)

@@ -1,36 +1,52 @@
-# Data files (large)
-data/raw/*.csv
-data/raw/*.tsv
-data/raw/*.xlsx
-data/raw/*.zip
+# --- Data: never commit raw or source data ---
+data/raw/*
+!data/raw/README.md
+data/interim/
+data/processed/
+*.parquet
+*.feather
 
-# Python
+# --- Model weights / embeddings (regenerate via code) ---
+*.pt
+*.bin
+*.onnx
+*.safetensors
+*.npy
+models/cache/
+models/checkpoints/
+training/checkpoints/
+
+# --- Structures (fetched by code) ---
+structures/pdb/
+
+# --- Credentials / secrets ---
+.env
+*.env
+*.pem
+*.key
+credentials/
+**/api_key*
+**/token*
+
+# --- Jupyter / Python ---
+.ipynb_checkpoints/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
-dist/
 build/
+dist/
 
-# Environments
-.env
-*.env
-env/
-venv/
-.conda/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# OS
+# --- OS / IDE / tooling ---
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/
+*.swp
+*~
 .idea/
+.vscode/
 
-# Model caches (large)
-models/cache/
-*.pt
-*.bin
+# --- Env ---
+env/
+.venv/
+venv/
+.conda/
