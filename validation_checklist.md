@@ -170,24 +170,33 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
 
 ---
 
-## E. Recommended but NOT yet run (before submission)
+## E. Pre-submission checks (completed)
 
-### E1 — Multiple-comparisons handling
+### E1 — Multiple-comparisons handling ✓
 - **What / why:** Many MW tests (≥6 models × 2 tiers × splits). Report p-values as
   nominal; state which survive Bonferroni. Headline effects (3×10⁻⁷) survive;
   borderline anti-ranking (AbLang 0.034) and AntiFold enrichment (0.012) may not.
-- **Question it will fix:** *Are the borderline claims robust to multiplicity?*
+- **Question fixed:** *Are the borderline claims robust to multiplicity?*
+- **Outcome:** Bonferroni applied. Only the strong effects survive; borderline
+  effects labelled nominal throughout the README and findings.
+- **Artifact:** correction applied in `e1_antirank.py` and reported in the README.
 
-### E2 — Second-dataset replication (Mason, zero-shot only)
+### E2 — Second-dataset replication (Mason, zero-shot only) ✓
 - **What / why:** Run the zero-shot anti-ranking + trivial-baseline enrichment on
   Mason (same target, binary FACS → binder retrieval). Cheap partial-generalization
   check without full KyDab/E5.
-- **Question it will fix:** *Does the zero-shot pattern replicate on a second assay?*
+- **Question fixed:** *Does the zero-shot pattern replicate on a second assay?*
+- **Outcome:** The PLMs *enrich* binders on Mason (p ≈ 10⁻⁴) — the opposite of the
+  Absci improver result. This became the task-dependence finding (Q4), not a failed
+  replication.
+- **Artifact:** `mason_binder_retrieval.csv` (from `e1b_mason_replication.py`).
 
-### E3 — Near-tier threshold sensitivity
+### E3 — Near-tier threshold sensitivity ✓
 - **What / why:** Confirm enrichment conclusions are robust to the top-decile
-  cutoff (5% / 20%). Appendix.
-- **Question it will fix:** *Is the near-tier result an artifact of the 10% threshold?*
+  cutoff (5% / 20%).
+- **Question fixed:** *Is the near-tier result an artifact of the 10% threshold?*
+- **Outcome:** Conclusions hold at 5%, 10%, and 20% cutoffs. No threshold sensitivity.
+- **Artifact:** `absci_sensitivity.csv` (from `e2h_sensitivity.py`).
 
 ---
 
