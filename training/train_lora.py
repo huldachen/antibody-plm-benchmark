@@ -303,6 +303,10 @@ def main() -> int:
                 "best_epoch": best_epoch,
                 "best_val_metric": best_val_metric,
                 "best_metric_key": best_metric_key,
+                # Recorded so downstream reporting never has to hardcode it:
+                # the count depends on lora_rank and the base model.
+                "trainable_params": trainable,
+                "total_params": total,
                 "test_metrics": test_metrics,
                 "label_summary": {
                     "train": label_summary(train_df, spec),

@@ -3,6 +3,22 @@
 Custom training loop for ESM-2 + LoRA on Mason / Absci CDR-H3 libraries. See the
 v3 task queue for context.
 
+> **Adapter weights are not retained.** `train_lora.py` writes `best_adapter/`
+> and `final_adapter/` locally, but they are **not committed** (weights are
+> gitignored, and the weights from the published run no longer exist on disk).
+> What ships is the run's *provenance* — `config.json` (hyperparameters, seed,
+> best epoch, test metrics) and `training_log.csv` (per-epoch curve) — plus the
+> baseline comparison in `results/mason_finetune_baselines.csv`. So the reported
+> numbers are **auditable but not re-scorable**: reproducing the fine-tuned row
+> requires re-running the training (~1 h on one GPU/MPS at the committed config),
+> whereas every non-LoRA baseline in that table re-computes in seconds from
+> `leak_check.py`.
+>
+> Scope, stated plainly: **one** configuration (`mason_cls_r8_lr1e-4_e5`), Mason
+> classification only. Not a hyperparameter sweep, not a label-budget learning
+> curve, and not yet evaluated under the distance-aware protocol — the split here
+> is random-stratified, so the fine-tuned number is an upper bound.
+
 ## Smoke test
 
 Run before any real training to confirm the pipeline (model load, data, forward,

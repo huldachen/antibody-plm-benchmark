@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 
@@ -99,6 +100,39 @@ def fit_and_score(
     }
 
 
+def _trainable_params(run_dir: str, cfg: dict) -> int | None:
+    """Trainable-parameter count for a run — read, never hardcoded.
+
+    The count depends on `lora_rank` and the base model, so a literal would go
+    silently wrong the moment either changes. Prefers the value recorded by
+    `train_lora.py`; falls back to parsing `run.log` for runs that predate that
+    field. Returns None when neither is available, so a missing count shows up
+    as missing rather than as a wrong number.
+
+    Parameters
+    ----------
+    run_dir : str
+        Checkpoint directory for the run.
+    cfg : dict
+        Parsed `config.json` for the run.
+
+    Returns
+    -------
+    int or None
+        Trainable parameters, or None if not recoverable.
+    """
+    n = cfg.get("trainable_params")
+    if isinstance(n, int):
+        return n
+    log_path = os.path.join(run_dir, "run.log")
+    if os.path.isfile(log_path):
+        with open(log_path, errors="ignore") as fh:
+            m = re.search(r"trainable=([\d,]+)", fh.read())
+        if m:
+            return int(m.group(1).replace(",", ""))
+    return None
+
+
 def lora_test_metrics(dataset: str) -> dict | None:
     """Read LoRA test metrics from the most recent matching checkpoint dir."""
     base = os.path.join(os.path.dirname(__file__), "checkpoints")
@@ -110,13 +144,14 @@ def lora_test_metrics(dataset: str) -> dict | None:
     )
     if not candidates:
         return None
-    with open(os.path.join(base, candidates[-1], "config.json")) as f:
+    run_dir = os.path.join(base, candidates[-1])
+    with open(os.path.join(run_dir, "config.json")) as f:
         cfg = json.load(f)
     args = cfg.get("args", {})
     tm = cfg.get("test_metrics", {})
     return {
         "label": f"ESM-2 LoRA r={args.get('lora_rank')} lr={args.get('lr'):g} ({candidates[-1]})",
-        "n_features": 7_724_802,  # rank=8 on ESM-2-650M; recompute if rank differs
+        "n_features": _trainable_params(run_dir, cfg),
         "roc_auc": tm.get("roc_auc"),
         "accuracy": tm.get("accuracy"),
         "mcc": tm.get("mcc"),
@@ -219,7 +254,9 @@ def main() -> int:
         print(f"{r['label']:<40s}  {r['n_features']:>10d}  "
               f"{r['roc_auc']:>8.4f}  {r['accuracy']:>6.4f}  {r['mcc']:>6.4f}")
     if res_lora is not None:
-        print(f"{res_lora['label']:<40s}  {res_lora['n_features']:>10d}  "
+        nf = res_lora["n_features"]
+        nf_s = f"{nf:,}" if nf is not None else "unknown"
+        print(f"{res_lora['label']:<40s}  {nf_s:>10s}  "
               f"{res_lora['roc_auc']:>8.4f}  {res_lora['accuracy']:>6.4f}  {res_lora['mcc']:>6.4f}")
     else:
         print(f"{'(no LoRA checkpoint for this dataset yet)':<40s}")
