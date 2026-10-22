@@ -49,6 +49,23 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
 - **Outcome:** Median rank dropped as a headline; discovery metrics (Recall@K,
   P@K, AUROC) lead. Seeded the whole "correlation ≠ discovery" thesis.
 
+### A4 — AUROC intervals, and the tier an AUROC may rest on
+- **What:** Attach stratified-bootstrap 95% CIs (2000 resamples, seed 0) to every
+  AUROC in the positive-definition experiment, and print the n of the positive set
+  beside each one.
+- **Why:** An AUROC on the strict tier (n = 5) has an interval wide enough to be
+  uninformative — and the *counter's* interval at that tier is just as wide. Quoting
+  a PLM value from n = 5 against a counter range taken from n = 420 / n = 42
+  silently compares different tiers.
+- **Question fixed:** *Which positive-set definition can carry an AUROC claim?*
+- **Outcome:** Only n = 420 (binders) and n = 42 (near-improvers). At n = 5 the
+  intervals are MutCount **0.684 [0.456, 0.903]** and AbLang **0.264 [0.130, 0.411]**
+  — a trend, never a headline. The mechanism claim is therefore stated on
+  binders → near-improvers: MutCount 0.634 [0.602, 0.667] → 0.723 [0.652, 0.790]
+  while AbLang 0.565 [0.531, 0.599] → 0.449 [0.373, 0.529].
+- **Artifact:** `absci_mason_mechanism.csv` (now carries `*_lo` / `*_hi` per model),
+  from `e1c_mechanism.py`.
+
 ---
 
 ## B. Structure arm (does inverse folding beat counting?)
@@ -201,4 +218,7 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
 ---
 
 *Provenance note: every check names its committed artifact above; the scored and
-metric tables live in `results/`.*
+metric tables live in `results/`. The `*_v2_metrics.csv` tables carry the global
+AUC-ROC / binder-classification framing of v1–v3, superseded by the
+improver-retrieval metrics in v4; they are retained as the record, not as current
+results.*

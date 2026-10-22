@@ -2,6 +2,18 @@
 
 **No method here robustly beats a mutation counter at retrieving affinity improvers — and standard evaluation hides this.**
 
+**The sharpest result — the label definition, not the model, decides the verdict.**
+Hold the dataset and the model scores completely fixed and change *only* what counts
+as a positive. On binder retrieval a mutation counter and AbLang sit close together
+(AUROC 0.63 [0.60–0.67] vs. 0.56 [0.53–0.60], n = 420). Redefine the positives as
+affinity *improvers* and they separate cleanly: the counter rises to 0.72 [0.65–0.79]
+while AbLang falls to 0.45 [0.37–0.53] — at or below chance (n = 42). Nothing about
+the model changed. Antibody PLMs encode a germline-naturalness prior, and affinity
+maturation is not a germline-proximity problem.
+*(95% CIs, stratified bootstrap, 2000 resamples — `results/absci_mason_mechanism.csv`
+from `experiments/e1c_mechanism.py`. The rarer strict tier, n = 5, is reported there
+with its interval and is far too wide to carry a claim.)*
+
 I benchmark PLMs, inverse-folding models, and low-N supervised regressors against trivial baselines for antibody affinity maturation. The contribution is an evaluation protocol — distance-aware splits, budget-matched precision@K, improver-tier separation — that exposes failure modes a global correlation on random splits conceals.
 
 <p align="center">
@@ -32,7 +44,7 @@ Standard benchmarks inflate apparent PLM performance on combinatorial CDR data i
 
 **Structure reduces to counting.** AntiFold on the trastuzumab–HER2 crystal out-enriches BLOSUM, yet its correlation vanishes once mutation count is controlled (raw ρ = +0.135 → partial ρ = +0.003, n.s.; ρ = −0.71 with mutation count). Whether reported inverse-folding advantages are partly a mutation-count artifact is a testable question.
 
-**Correlation ≠ discovery.** With leakage removed via distance-aware splits, ridge regression keeps a correlation advantage (ρ 0.68 → 0.48 vs. a flat counter) but matches counting under stringent, budget-matched precision@K.
+**Correlation ≠ discovery.** With leakage removed via distance-aware splits, ridge regression keeps a correlation advantage (ρ 0.68 → 0.48 vs. a flat counter) but matches counting under stringent, budget-matched precision@K. On the discovery metric itself — near-improver AUROC (n = 42, 20 seeds) — the edge nearly closes: Ridge 0.72 ± 0.03 vs. MutCount 0.65 ± 0.03 at d ≥ 5, a +0.06 gap, down from +0.36 at d = 1.
 
 ## Models
 

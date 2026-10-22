@@ -2,7 +2,7 @@
 """
 E1c (mechanism) — is PLM enrichment set by the positive set's low-mutation skew?
 
-A controlled test. Four conditions vary in how strongly their positive set
+Hulda's controlled test. Four conditions vary in how strongly their positive set
 skews toward low mutation count: Mason binders, Absci binders, Absci
 near-improvers, Absci strict improvers. For each we measure, on the SAME pool and
 scores:
@@ -42,8 +42,52 @@ PLMS = [("ESM-2", "ESM2_score", "#C0392B"),
         ("AntiBERTy", "AntiBERTy_score", "#2E8B57")]
 
 
+N_BOOT = 2000
+BOOT_SEED = 0
+
+
 def auroc(pos_mask, score):
     return roc_auc_score(pos_mask.astype(int), score)
+
+
+def auroc_ci(pos_mask, score, n_boot: int = N_BOOT, seed: int = BOOT_SEED):
+    """Stratified bootstrap 95% CI for an AUROC.
+
+    Positives and negatives are resampled independently, holding n_pos and
+    n_neg fixed, so the interval reflects the rarity of the positive set --
+    the dominant source of uncertainty when n_pos is small. The strict
+    improver tier has n_pos = 5, where the interval is wide enough that its
+    point estimate must never carry a claim on its own.
+
+    Parameters
+    ----------
+    pos_mask : np.ndarray
+        Boolean mask marking the positive set.
+    score : np.ndarray
+        Model score; higher = predicted fitter.
+    n_boot : int
+        Number of bootstrap resamples.
+    seed : int
+        Seed, for reproducibility.
+
+    Returns
+    -------
+    tuple of float
+        Percentile (lo, hi) 95% bounds.
+    """
+    pos_mask = np.asarray(pos_mask).astype(bool)
+    score = np.asarray(score, dtype=float)
+    pos, neg = score[pos_mask], score[~pos_mask]
+    n_p, n_n = len(pos), len(neg)
+    y = np.r_[np.ones(n_p), np.zeros(n_n)]
+    rng = np.random.default_rng(seed)
+    stats = np.empty(n_boot, dtype=float)
+    for b in range(n_boot):
+        s = np.r_[rng.choice(pos, n_p, replace=True),
+                  rng.choice(neg, n_n, replace=True)]
+        stats[b] = roc_auc_score(y, s)
+    lo, hi = np.percentile(stats, [2.5, 97.5])
+    return float(lo), float(hi)
 
 
 def main() -> None:
@@ -64,13 +108,30 @@ def main() -> None:
     rows = []
     for name, df, pos, mut in conditions:
         x = auroc(pos, -mut)                       # MutCount AUROC (low-mut skew)
+        x_lo, x_hi = auroc_ci(pos, -mut)
         row = {"condition": name, "n_pos": int(pos.sum()),
-               "mutcount_auroc": x}
+               "mutcount_auroc": x,
+               "mutcount_lo": x_lo, "mutcount_hi": x_hi}
         for pname, col, _ in PLMS:
-            row[f"{pname}_auroc"] = auroc(pos, df[col].values)
+            s = df[col].values
+            row[f"{pname}_auroc"] = auroc(pos, s)
+            lo, hi = auroc_ci(pos, s)
+            row[f"{pname}_lo"], row[f"{pname}_hi"] = lo, hi
         rows.append(row)
     res = pd.DataFrame(rows)
     res.to_csv(OUT_CSV, index=False)
+
+    # Interval-aware view: every AUROC with its 95% CI and the n it rests on.
+    print("\nAUROC with stratified-bootstrap 95% CI "
+          f"({N_BOOT} resamples, seed {BOOT_SEED}):")
+    for _, r in res.iterrows():
+        print(f"  {r['condition']:<24} n_pos={int(r['n_pos']):>4}  "
+              f"MutCount {r['mutcount_auroc']:.3f} "
+              f"[{r['mutcount_lo']:.3f},{r['mutcount_hi']:.3f}]")
+        for pname, _, _ in PLMS:
+            print(f"      {pname:<22} {r[f'{pname}_auroc']:.3f} "
+                  f"[{r[f'{pname}_lo']:.3f},{r[f'{pname}_hi']:.3f}]  "
+                  f"(width {r[f'{pname}_hi'] - r[f'{pname}_lo']:.2f})")
     with pd.option_context("display.float_format", lambda v: f"{v:.3f}",
                            "display.width", 200):
         print(res.to_string(index=False))
