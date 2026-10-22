@@ -2,7 +2,7 @@
 """
 E1c (mechanism) — is PLM enrichment set by the positive set's low-mutation skew?
 
-Hulda's controlled test. Four conditions vary in how strongly their positive set
+A controlled test. Four conditions vary in how strongly their positive set
 skews toward low mutation count: Mason binders, Absci binders, Absci
 near-improvers, Absci strict improvers. For each we measure, on the SAME pool and
 scores:
