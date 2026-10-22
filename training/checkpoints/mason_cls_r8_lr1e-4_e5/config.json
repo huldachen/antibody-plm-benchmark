@@ -1,0 +1,32 @@
+{
+  "args": {
+    "dataset": "mason",
+    "task": "classification",
+    "model_name": "facebook/esm2_t33_650M_UR50D",
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_dropout": 0.05,
+    "lr": 0.0001,
+    "epochs": 5,
+    "batch_size": 8,
+    "max_length": 32,
+    "seed": 42,
+    "output_dir": "training/checkpoints/mason_cls_r8_lr1e-4_e5",
+    "device": "mps",
+    "smoke_test": false
+  },
+  "best_epoch": 2,
+  "best_val_metric": 0.9084197271536343,
+  "best_metric_key": "roc_auc",
+  "test_metrics": {
+    "accuracy": 0.845054945054945,
+    "mcc": 0.6424324586431072,
+    "roc_auc": 0.9007937432240141,
+    "loss": 0.41854894880491955
+  },
+  "label_summary": {
+    "train": "n=29111 class_counts={0: 20090, 1: 9021}",
+    "val": "n=3640 class_counts={0: 2512, 1: 1128}",
+    "test": "n=3640 class_counts={0: 2512, 1: 1128}"
+  }
+}

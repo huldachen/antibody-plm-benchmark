@@ -14,7 +14,10 @@ data/processed/
 *.npy
 models/cache/
 models/checkpoints/
-training/checkpoints/
+# training checkpoints: keep small run provenance (config/log), never weights
+training/checkpoints/**/*.bin
+training/checkpoints/**/*.safetensors
+training/checkpoints/**/*.pt
 
 # --- Structures (fetched by code) ---
 structures/pdb/

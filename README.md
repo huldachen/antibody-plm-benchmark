@@ -132,11 +132,28 @@ Every number comes from a committed script. Metrics recompute from scored CSVs �
 
 ## Status
 
-Q1–Q4 are complete and reproducible from committed scores. In progress:
+Q1–Q4 are complete and reproducible from committed scores.
 
-- **Fine-tuning learning curve** — does task-specific supervision close the gap, and does it survive distance-aware splits? (extends Q3)
-- **Benchmark expansion** — additional combinatorial antibody datasets to test protocol generality
-- **Manuscript** — targeting a workshop methods contribution
+**Fine-tuning — preliminary result (extends Q3).** LoRA fine-tuning of ESM-2-650M on
+Mason binder classification does **not** beat one-hot baselines on the same split:
+
+| method | features / trainable params | test ROC-AUC |
+|---|---:|---:|
+| LR on mutation count | 1 | 0.771 |
+| LR on one-hot CDR-H3 | 200 | 0.897 |
+| ESM-2-650M + LoRA (r = 8) | 7.7 M | 0.901 |
+| **MLP(128) on one-hot** | 200 | **0.920** |
+
+A fine-tuned 650M-parameter PLM ties a logistic regression and *loses to a small MLP
+on the same 200 one-hot features* — the zero-shot finding surviving supervision.
+**Caveat:** this is a *random stratified* split (median nearest-train Hamming = 3;
+6.2% of test within d ≤ 1) — precisely the optimistic regime this benchmark warns
+about, so treat it as an upper bound. Re-running it under the distance-aware
+protocol is the open question. Artifact: `results/mason_finetune_baselines.csv`
+via `training/leak_check.py`.
+
+**Also in progress:** manuscript draft (workshop methods contribution).
+**Planned:** benchmark expansion to further combinatorial antibody datasets.
 
 ## Limitations
 

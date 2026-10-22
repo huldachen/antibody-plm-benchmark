@@ -70,6 +70,19 @@ scripts/merge_fitness.py ▶ restores measured values into the committed scored 
 | `reevaluate.py` ✓ | Recompute the v2 metric suite on the committed scored CSVs (no model re-run). | `absci_v2_metrics.csv`, `mason_v2_metrics.csv`, `absci_improver_ranks.csv` |
 | `experiments/extract_embeddings.py` ⟲ | Cache mean-pooled PLM embeddings (ESM-2 1280-d, AbLang 768-d) consumed by `e2d_embeddings.py`. Requires GPU. | `*.npy` (gitignored) |
 
+## Fine-tuning — preliminary, extends Q3 (`training/`)
+
+| Script | Role | Output |
+|---|---|---|
+| `training/train_lora.py` ⟲ | LoRA fine-tune of ESM-2-650M on Mason / Absci (custom loop, not `Trainer`). Needs torch + GPU. | `training/checkpoints/<run>/` (config + log committed; weights gitignored) |
+| `training/leak_check.py` ▶ | The diagnostic that earns the result: split-overlap check, nearest-train Hamming distribution, and one-hot / mutation-count baselines against the LoRA run. Pure pandas+sklearn — **no torch needed**. | `results/mason_finetune_baselines.csv` |
+| `training/dataloader.py` 📦 | Dataset specs, dedup-by-sequence, stratified split. torch imported lazily so the leak check runs in the analysis env (DEC-011). | — |
+
+*Every row of `mason_finetune_baselines.csv` carries its split diagnostics
+(`split_type`, `median_nearest_train_hamming`, `frac_test_d_le_1`) so the metric
+cannot be read apart from the caveat that qualifies it — this is a random
+stratified split, an upper bound, not a distance-aware result.*
+
 ## Data & figures
 
 | Script | Role |
