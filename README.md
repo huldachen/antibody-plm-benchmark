@@ -127,7 +127,7 @@ affinity-ranking method, internal or vendor.
 ## What I corrected
 
 Several early numbers moved under scrutiny. Corrected values are below; the full
-log is in `validation_checklist.md`.
+log is in `docs/validation_checklist.md`.
 
 - **Full-CDR basis.** The first analysis scored CDR-H3 only; Absci variants also
   vary in HCDR1/HCDR2. Re-ran on the complete 29-position basis. Conclusions held.
@@ -148,8 +148,8 @@ log is in `validation_checklist.md`.
 ## Reproducibility
 
 Every number comes from a committed script, and metrics recompute from the
-scored CSVs without re-running any model. `validation_checklist.md` names the
-artifact behind each claim; `CODEMAP.md` documents every script, its output, and
+scored CSVs without re-running any model. `docs/validation_checklist.md` names the
+artifact behind each claim; `docs/CODEMAP.md` documents every script, its output, and
 its role. Structure tools live in a separate conda env
 (`environment_antifold.yml`) because their pinned dependencies conflict with the
 analysis stack.
@@ -212,7 +212,7 @@ reported with its interval and is too small to carry a claim — the headline re
 on the n = 42 tier. The structure arm is fixed-backbone only. Zero-shot PLM
 scores model CDR-H3 variation only; HCDR1/2 variation (20% of variants, 0% of
 improvers) is unmodelled, and conclusions were re-verified on the exactly-scored
-subset. Full log in `validation_checklist.md`.
+subset. Full log in `docs/validation_checklist.md`.
 
 ## License
 

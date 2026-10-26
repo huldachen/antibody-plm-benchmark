@@ -126,8 +126,8 @@ stratified split, an upper bound, not a distance-aware result.*
 | `.gitignore` | Excludes `data/raw/`, model weights, `.npy` embeddings, `__pycache__/`, OS files. |
 | `LICENSE` | MIT (code and computed outputs). |
 | `README.md` | Repo-level README with motivation, research questions, findings, evaluation protocol, quickstart. |
-| `CODEMAP.md` | This file. |
-| `validation_checklist.md` | Full robustness / self-audit log (A1–E3). Names every skeptical check, the question it fixed, the outcome, and the committed artifact. |
+| `docs/CODEMAP.md` | This file. |
+| `docs/validation_checklist.md` | Full robustness / self-audit log (A1–E3). Names every skeptical check, the question it fixed, the outcome, and the committed artifact. |
 | `data/raw/README.md` | Access instructions for the three source datasets (Mason, Absci, KyDab) and what ships in `results/`. |
 | `figures/README.md` | Figure-level captions mapping each PNG to the result it visualises. |
 
