@@ -7,10 +7,13 @@ Hold the dataset and the model scores completely fixed and change *only* what co
 as a positive. On binder retrieval a mutation counter and AbLang sit close together
 (AUROC 0.63 [0.60–0.67] vs. 0.56 [0.53–0.60], n = 420). Redefine the positives as
 affinity *improvers* and they separate cleanly: the counter rises to 0.72 [0.65–0.79]
-while AbLang falls to 0.45 [0.37–0.53] — at or below chance (n = 42). Nothing about
+while AbLang falls to 0.45 [0.37–0.53] — at or below chance (n = 42; paired DeLong on
+the same variants, Δ = 0.27, **p = 4.3×10⁻⁷**). Nothing about
 the model changed. Antibody PLMs encode a germline-naturalness prior, and affinity
 maturation is not a germline-proximity problem.
-*(95% CIs, stratified bootstrap, 2000 resamples — `results/absci_mason_mechanism.csv`
+*(95% CIs, stratified bootstrap, 2000 resamples; AUC differences tested with a paired
+DeLong test (`evaluation/delong.py`), since per-model intervals do not test a
+difference between correlated AUCs — `results/absci_mason_mechanism.csv`
 from `experiments/e1c_mechanism.py`. The rarer strict tier, n = 5, is reported there
 with its interval and is far too wide to carry a claim.)*
 

@@ -24,6 +24,7 @@ import time
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 import torch
 from sklearn.metrics import (
     accuracy_score,
@@ -119,6 +120,13 @@ def evaluate(model, loader, device, is_classification: bool) -> dict:
     labels = np.concatenate(all_labels, axis=0)
     metrics = compute_metrics(preds, labels, is_classification)
     metrics["loss"] = total_loss / max(n, 1)
+    # Keep the raw per-sample outputs so downstream comparisons (e.g. a paired
+    # DeLong test against the one-hot baselines) remain possible WITHOUT the
+    # adapter. Predictions are a few KB and never go stale; adapter weights are
+    # hundreds of MB, gitignored, and in practice get deleted -- which is
+    # exactly how the first published run became impossible to re-test.
+    metrics["_preds"] = preds
+    metrics["_labels"] = labels
     return metrics
 
 
@@ -292,7 +300,24 @@ def main() -> int:
 
     # Final test eval using last-epoch weights (best is also saved separately)
     test_metrics = evaluate(model, test_loader, device, spec.is_classification)
+    test_preds = test_metrics.pop("_preds")
+    test_labels = test_metrics.pop("_labels")
     print(f"[test] {test_metrics}")
+
+    # Persist per-sample test predictions BEFORE anything else: this is what
+    # makes the run comparable to other models later (paired DeLong), and it
+    # survives deletion of the adapter.
+    pred_path = os.path.join(args.output_dir, "test_predictions.csv")
+    if spec.is_classification:
+        score = torch.softmax(torch.from_numpy(test_preds), dim=-1).numpy()[:, 1]
+    else:
+        score = test_preds.reshape(-1)
+    pd.DataFrame({
+        spec.seq_col: test_df[spec.seq_col].to_numpy(),
+        "label": test_labels,
+        "score": score,
+    }).to_csv(pred_path, index=False)
+    print(f"[test] per-sample predictions -> {pred_path}")
 
     # Save run config + final adapter
     model.save_pretrained(os.path.join(args.output_dir, "final_adapter"))

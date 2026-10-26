@@ -32,6 +32,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from evaluation.improver_metrics import improver_mask, near_improver_mask  # noqa: E402
+from evaluation.delong import delong_test  # noqa: E402
 
 ABSCI = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
 MASON = os.path.join(PROJECT_ROOT, "results", "mason_all_scored.csv")
@@ -117,6 +118,13 @@ def main() -> None:
             row[f"{pname}_auroc"] = auroc(pos, s)
             lo, hi = auroc_ci(pos, s)
             row[f"{pname}_lo"], row[f"{pname}_hi"] = lo, hi
+            # Paired DeLong vs the mutation counter on the SAME samples. The
+            # per-model bootstrap intervals above do not test this difference;
+            # overlapping intervals and a significant paired difference are
+            # entirely compatible, so the comparison needs its own statistic.
+            dl = delong_test(pos.astype(int), -mut.astype(float), s)
+            row[f"{pname}_vs_mut_delta"] = dl["delta"]
+            row[f"{pname}_vs_mut_p"] = dl["p"]
         rows.append(row)
     res = pd.DataFrame(rows)
     res.to_csv(OUT_CSV, index=False)
