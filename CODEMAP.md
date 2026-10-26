@@ -90,6 +90,7 @@ stratified split, an upper bound, not a distance-aware result.*
 | `data/download_{absci,mason,kydab}.py` ⟲ | Process each source dataset into the local (gitignored) tables. |
 | `scripts/merge_fitness.py` ▶ | Restore stripped measured values (Kd / labels) into the committed scored CSVs. |
 | `figures/make_figures.py` ▶ | Render F1–F4 from the committed CSVs into `figures/`. |
+| `figures/make_figure5_label_definition.py` ▶ | Render F5 (README hero) from `absci_mason_mechanism.csv` — the controlled label-definition sweep with bootstrap CIs and the paired DeLong p. |
 
 ## Libraries (imported, no standalone output) 📦
 

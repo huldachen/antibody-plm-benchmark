@@ -1,96 +1,165 @@
 # Antibody PLM Benchmark
 
-**No method here robustly beats a mutation counter at retrieving affinity improvers — and standard evaluation hides this.**
+**Do protein language models actually help choose better antibodies? On this benchmark — no. And the standard way of evaluating them hides that.**
 
-**The sharpest result — the label definition, not the model, decides the verdict.**
-Hold the dataset and the model scores completely fixed and change *only* what counts
-as a positive. On binder retrieval a mutation counter and AbLang sit close together
-(AUROC 0.63 [0.60–0.67] vs. 0.56 [0.53–0.60], n = 420). Redefine the positives as
-affinity *improvers* and they separate cleanly: the counter rises to 0.72 [0.65–0.79]
-while AbLang falls to 0.45 [0.37–0.53] — at or below chance (n = 42; paired DeLong on
-the same variants, Δ = 0.27, **p = 4.3×10⁻⁷**). Nothing about
-the model changed. Antibody PLMs encode a germline-naturalness prior, and affinity
-maturation is not a germline-proximity problem.
-*(95% CIs, stratified bootstrap, 2000 resamples; AUC differences tested with a paired
-DeLong test (`evaluation/delong.py`), since per-model intervals do not test a
-difference between correlated AUCs — `results/absci_mason_mechanism.csv`
-from `experiments/e1c_mechanism.py`. The rarer strict tier, n = 5, is reported there
-with its interval and is far too wide to carry a claim.)*
-
-I benchmark PLMs, inverse-folding models, and low-N supervised regressors against trivial baselines for antibody affinity maturation. The contribution is an evaluation protocol — distance-aware splits, budget-matched precision@K, improver-tier separation — that exposes failure modes a global correlation on random splits conceals.
+Antibody engineering teams increasingly rank candidate molecules with protein
+language models (PLMs), structure models, or small supervised models. I tested
+those methods against deliberately trivial baselines on a real
+affinity-maturation task and found that **none of them reliably beats simply
+counting mutations.** The durable contribution here is not the negative result
+but the *evaluation protocol* that reveals it — and a worked demonstration that
+the evaluation design, not the model, often decides the published conclusion.
 
 <p align="center">
-  <img src="figures/F4_correlation_vs_discovery.png" width="760"
-       alt="The advantage that generalizes (correlation) is not the one that discovers">
+  <img src="figures/F5_label_definition.png" width="900"
+       alt="Changing only the definition of a positive reverses the verdict: a mutation counter improves while PLMs fall below chance">
 </p>
 
----
+**The sharpest single result, shown above.** Hold the dataset and the model
+scores completely fixed and change *only* what counts as a "good" variant. A
+parameter-free mutation counter rises from AUROC 0.63 [0.60–0.67] to 0.72
+[0.65–0.79], while AbLang falls from 0.56 [0.53–0.60] to 0.45 [0.37–0.53] — at or
+below chance (n = 420 → n = 42; paired DeLong, Δ = 0.27, **p = 4.3×10⁻⁷**).
+Nothing about the models changed. Antibody PLMs encode a germline-*naturalness*
+prior, and affinity maturation is not a germline-proximity problem.
+
+## At a glance
+
+| | |
+|---|---|
+| **Problem** | Which antibody variants should a team synthesise next, given a few measured examples? |
+| **Data** | 1,266 trastuzumab CDR variants with SPR Kd (Absci); 36,391 CDR-H3 variants with FACS labels (Mason 2021); KyDab multi-target panel |
+| **Methods compared** | mutation count, BLOSUM62, ESM-2 (650M), AbLang, AntiBERTy, AntiFold (inverse folding), ridge regression, LoRA fine-tuning |
+| **Statistics** | stratified bootstrap CIs, paired DeLong tests, partial correlation, tie-corrected Mann–Whitney, Bonferroni |
+| **Headline** | No method robustly beats counting mutations at retrieving improvers |
+| **Reusable output** | A 6-point evaluation protocol for vetting any affinity-ranking method |
 
 ## Why this matters
 
-Antibody affinity maturation is resource-bound: from a large combinatorial CDR library, a team can only synthesize and assay a small number of variants per round. The decision that consumes wet-lab budget is not "predict every Kd" but "put the rare improvers at the top of a short list." A model can look good on global correlation and still be useless at that decision.
+Affinity maturation is resource-bound. From a large combinatorial library a team
+can only synthesise and assay a small number of variants per round, so the
+decision that consumes the budget is not *"predict every Kd"* but *"put the rare
+improvers at the top of a short list."* A model can look strong on global
+correlation and still be useless at that decision.
 
-Standard benchmarks inflate apparent PLM performance on combinatorial CDR data in two ways: fitness correlates with edit distance from the parent, so any score tracking mutation count inherits signal; and random splits place near-duplicates in the test set, so the model memorizes rather than generalizes. I designed this benchmark to separate these confounds.
+Two properties of combinatorial antibody data make standard benchmarks
+optimistic. Fitness correlates with edit distance from the parent, so any score
+that tracks mutation count inherits signal it did not earn. And random splits
+place near-duplicates of training variants into the test set, so a model can
+memorise rather than generalise. This benchmark is built to separate both.
 
-## Research questions
+## Findings
 
-| | Question | Verdict |
-|---|---|---|
-| **Q1** | Do zero-shot PLMs or inverse folding beat a mutation counter at enriching improvers? | No. Only parent-distance baselines significantly enrich. |
-| **Q2** | Does fixed-backbone inverse folding add signal beyond mutation count? | No. AntiFold's correlation vanishes under partial-ρ control. |
-| **Q3** | Does low-N supervision convert a correlation edge into a discovery edge? | Not robustly. Ridge keeps correlation but ≈ counting under stringent precision@K. |
-| **Q4** | Do conclusions hold across metric, label budget, and task? | Partially — PLM effect *flips* between binder vs. improver retrieval. |
+### 1. Two priors, and only one finds improvers
 
-## Key findings
+Mutation count (MW p = 3.2×10⁻⁷) and BLOSUM62 (p = 1.9×10⁻³) significantly
+enrich improvers; the antibody PLMs do not. The PLMs are not broken — they
+encode a *different* prior. Its usefulness **flips with the task**: on Mason the
+same PLMs *enrich* binders (n = 154 binders of 500 variants; p ≈ 10⁻⁴), because
+binders there happen to be low-mutation.
 
-**Two priors, only one enriches improvers.** Mutation count (MW p = 3.2×10⁻⁷) and BLOSUM62 (p = 1.9×10⁻³) significantly enrich improvers; antibody PLMs do not. PLMs encode a germline-naturalness prior, not the parent-distance prior that matters here. The effect **flips with the task**: on Mason, the same PLMs *enrich* binders (n = 154 binders of 500 variants; p ≈ 10⁻⁴) because binders there are low-mutation.
+<p align="center"><img src="figures/F2_zeroshot_two_prior.png" width="760" alt="Parent-distance baselines enrich improvers; PLMs do not"></p>
 
-**Structure reduces to counting.** AntiFold on the trastuzumab–HER2 crystal out-enriches BLOSUM, yet its correlation vanishes once mutation count is controlled (raw ρ = +0.135 → partial ρ = +0.003, n.s.; ρ = −0.71 with mutation count). Whether reported inverse-folding advantages are partly a mutation-count artifact is a testable question.
+### 2. Fixed-backbone structure reduces to counting
 
-**Correlation ≠ discovery.** With leakage removed via distance-aware splits, ridge regression keeps a correlation advantage (ρ 0.68 → 0.48 vs. a flat counter) but matches counting under stringent, budget-matched precision@K. On the discovery metric itself — near-improver AUROC (n = 42, 20 seeds) — the edge nearly closes: Ridge 0.72 ± 0.03 vs. MutCount 0.65 ± 0.03 at d ≥ 5, a +0.06 gap, down from +0.36 at d = 1.
+AntiFold scored on the trastuzumab–HER2 crystal out-enriches BLOSUM, yet its
+correlation with affinity vanishes once mutation count is controlled
+(raw ρ = +0.135 → partial ρ = +0.003, n.s.; ρ = −0.71 with mutation count). We
+raise as a testable question whether reported inverse-folding advantages are
+partly a mutation-count artifact.
 
-## Models
+<p align="center"><img src="figures/F3_structure_counting.png" width="760" alt="AntiFold's correlation disappears under partial correlation control"></p>
 
-| Model | Type | Why included |
-|---|---|---|
-| **Mutation count** | parent-distance | The baseline every method must beat |
-| **BLOSUM62** | substitution-scored distance | Adds biochemistry to distance |
-| **ESM-2 (650M)** | general PLM, masked-marginal | Most-used zero-shot ranker |
-| **AbLang, AntiBERTy** | antibody-specific PLMs | Do antibody LMs help? |
-| **AntiFold** | inverse folding (PDB 1N8Z) | Fixed-backbone structure prior |
-| **Ridge** (one-hot / compact) | low-N supervised | Does spending a few labels beat counting? |
+### 3. A correlation edge is not a discovery edge
 
-## Evaluation protocol
+Combinatorial libraries leak: a random split puts near-duplicates in the test
+set. With distance-aware splits, ridge regression keeps a *correlation*
+advantage (ρ 0.68 → 0.48 vs a flat counter) but matches counting on the metric
+that reflects the actual decision — a stringent, budget-matched precision@K. On
+near-improver AUROC (n = 42, 20 seeds) the edge nearly closes: Ridge 0.72 ± 0.03
+vs MutCount 0.65 ± 0.03 at d ≥ 5, a +0.06 gap, down from +0.36 at d = 1.
 
-A pre-campaign checklist for vetting any affinity-ranking method:
+<p align="center">
+  <img src="figures/F1_leakage.png" width="440" alt="Near-duplicate leakage between train and test">
+  <img src="figures/F4_correlation_vs_discovery.png" width="440" alt="The advantage that generalises is not the one that discovers">
+</p>
+
+### 4. Fine-tuning does not rescue it
+
+LoRA fine-tuning of ESM-2-650M on Mason binder classification does not beat
+one-hot baselines on the same split:
+
+| method | features / trainable params | test ROC-AUC |
+|---|---:|---:|
+| LR on mutation count | 1 | 0.771 |
+| LR on one-hot CDR-H3 | 200 | 0.897 |
+| ESM-2-650M + LoRA (r = 8) | 7.7 M | 0.901 |
+| **MLP(128) on one-hot** | 200 | **0.920** |
+
+A fine-tuned 650M-parameter PLM ties a logistic regression and does not beat a
+small MLP on the same 200 one-hot features. **Caveat:** this is a *random
+stratified* split (median nearest-train Hamming = 3) — the optimistic regime
+this benchmark warns about, so treat it as an upper bound. Re-running it under
+the distance-aware protocol is the open question.
+
+## The evaluation protocol
+
+The reusable contribution: a pre-campaign checklist for vetting any
+affinity-ranking method, internal or vendor.
 
 1. Report a **mutation-count baseline** (and BLOSUM62)
 2. Use **distance-/cluster-aware splits**; quantify near-duplicate leakage
 3. Report **budget-matched precision@K**, not only global correlation
-4. **Separate the tiers** — binder vs. beat-parent (improver) retrieval
+4. **Separate the tiers** — binder vs beat-parent (improver) retrieval
 5. **Control for mutation count** via partial correlation
 6. **Correct for multiple comparisons**; label borderline effects nominal
 
-## What I corrected
-
-Several early numbers moved under scrutiny. Corrected values below; full log in `validation_checklist.md`.
-
-- **Full-CDR basis.** First analysis scored CDR-H3 only; Absci variants also vary in HCDR1/HCDR2. Re-ran on the complete 29-position basis. Conclusions held.
-- **Leakage overstated.** CDR-H3-only distance exaggerated near-duplication: within-Hamming-≤2 overlap 39% → 27%, exact duplicates 14 → 0.
-- **A signal demoted.** ESM-2's partial correlation was nominally anti-fitness on the CDR-H3 basis (ρ = −0.11, p = 0.02) but did not survive full-CDR re-scoring. Dropped.
-- **Tie correction.** Strict-tier enrichment p rested on a score tie; midrank Mann–Whitney moved it 0.028 → 0.075. Now applied to every rank statistic.
-- **Mason flipped the thesis.** Expected the anti-ranking to replicate; instead PLMs *enrich* binders there. The sign of the PLM effect depends on the task — this became load-bearing, not a failed replication.
-- **Multiple comparisons.** Only the strong effects survive Bonferroni; borderline effects labelled nominal.
-
 ## Practical implications
 
-- **Check the trivial baseline first.** Before trusting any zero-shot model to rank affinity-maturation variants, verify it beats "fewer mutations from the parent." Most here do not.
-- **Route models by objective.** Antibody PLMs help for humanness, developability, and immunogenicity. They hurt for affinity improver-ranking.
-- **Don't trust random-split validation.** Supervised models validated on random splits of combinatorial libraries return optimistic upper bounds. Use distance-aware splits + budget-matched precision@K.
+- **Check the trivial baseline first.** Before trusting any zero-shot model to
+  rank affinity-maturation variants, verify it beats "fewer mutations from the
+  parent." Most here do not.
+- **Route models by objective.** Antibody PLMs help for humanness,
+  developability, and immunogenicity. They hurt for affinity improver-ranking.
+- **Don't trust random-split validation** on combinatorial libraries; it returns
+  optimistic upper bounds.
 
-## Data
+## What I corrected
 
-Source datasets (Absci HER2 SPR Kd, Mason 2021 FACS, KyDab) are **not redistributed**. Tables in `results/` contain computed columns only (sequences, mutation counts, model scores); measured values are stripped. Download from the original sources (`data/raw/README.md`) and restore:
+Several early numbers moved under scrutiny. Corrected values are below; the full
+log is in `validation_checklist.md`.
+
+- **Full-CDR basis.** The first analysis scored CDR-H3 only; Absci variants also
+  vary in HCDR1/HCDR2. Re-ran on the complete 29-position basis. Conclusions held.
+- **Leakage overstated.** CDR-H3-only distance exaggerated near-duplication:
+  within-Hamming-≤2 overlap 39% → 27%, exact duplicates 14 → 0.
+- **A signal demoted.** ESM-2's partial correlation was nominally anti-fitness on
+  the CDR-H3 basis (ρ = −0.11, p = 0.02) but did not survive full-CDR re-scoring.
+  Dropped.
+- **Tie correction.** Strict-tier enrichment p rested on a score tie; midrank
+  Mann–Whitney moved it 0.028 → 0.075. Now applied to every rank statistic.
+- **Mason flipped the thesis.** I expected the anti-ranking to replicate; instead
+  PLMs *enrich* binders there. The sign depends on the task — this became
+  load-bearing rather than a failed replication.
+- **Testing differences, not intervals.** Per-model bootstrap CIs do not test a
+  difference between two correlated AUCs; added a paired DeLong test
+  (`evaluation/delong.py`).
+
+## Reproducibility
+
+Every number comes from a committed script, and metrics recompute from the
+scored CSVs without re-running any model. `validation_checklist.md` names the
+artifact behind each claim; `CODEMAP.md` documents every script, its output, and
+its role. Structure tools live in a separate conda env
+(`environment_antifold.yml`) because their pinned dependencies conflict with the
+analysis stack.
+
+## Data — not redistributed
+
+Source datasets (Absci HER2 SPR Kd, Mason 2021 FACS, KyDab) are **not** included.
+Tables in `results/` carry computed columns only (sequences, mutation counts,
+model scores); measured values are stripped. Download from the original sources
+(`data/raw/README.md`) and restore:
 
 ```bash
 python scripts/merge_fitness.py absci --raw /path/to/absci_her2_spr.csv
@@ -98,7 +167,8 @@ python scripts/merge_fitness.py kydab --raw /path/to/kydab.csv
 python scripts/merge_fitness.py mason --raw /path/to/mason_cdrh3.csv
 ```
 
-Model weights, PLM embeddings, and the 1N8Z crystal are downloaded by the code, not committed.
+Model weights, PLM embeddings, and the 1N8Z crystal are downloaded by the code,
+not committed.
 
 ## Quickstart
 
@@ -108,9 +178,10 @@ conda env create -f environment_antifold.yml   # optional: AntiFold (isolated de
 
 python scripts/merge_fitness.py absci --raw <your absci table>
 
-python experiments/e1_antirank.py             # Q1: zero-shot enrichment
-python experiments/e2f_distance_split.py      # Q3: leakage-free supervised
-python experiments/e4b_fullcdr_eval.py        # Q2: structure partial-ρ
+python experiments/e1_antirank.py             # zero-shot enrichment
+python experiments/e1c_mechanism.py           # the label-definition result (F5)
+python experiments/e2f_distance_split.py      # leakage-free supervised
+python experiments/e4b_fullcdr_eval.py        # structure partial-ρ
 python figures/make_figures.py                # F1–F4
 ```
 
@@ -118,50 +189,32 @@ python figures/make_figures.py                # F1–F4
 
 ```
 models/         scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy (masked-marginal)
-evaluation/     metrics — improver_metrics.py, lowN_protocol.py, metrics.py, stratify.py
+evaluation/     metrics — improver_metrics.py, lowN_protocol.py, delong.py, metrics.py
 experiments/    e1* zero-shot · e2* supervised + leakage · e4* structure
 structures/     AntiFold fixed-backbone scoring on 1N8Z
+training/       LoRA fine-tuning + the leak-check / baseline comparison
 data/           download scripts + data/raw/README.md (access instructions)
 scripts/        merge_fitness.py (restore source measured values)
 results/        computed scores + derived-metric CSVs (no source measured values)
-figures/        F1–F4 + make_figures.py
+figures/        F1–F5 + generation scripts
 ```
-
-`CODEMAP.md` documents every script, its output, and its role (default path / robustness check / regenerate-from-scratch).
-
-## Reproducibility
-
-Every number comes from a committed script. Metrics recompute from scored CSVs — no model re-run needed. Structure tools are in a separate conda env (`environment_antifold.yml`) due to dependency conflicts. `validation_checklist.md` names the artifact behind each claim.
 
 ## Status
 
-Q1–Q4 are complete and reproducible from committed scores.
-
-**Fine-tuning — preliminary result (extends Q3).** LoRA fine-tuning of ESM-2-650M on
-Mason binder classification does **not** beat one-hot baselines on the same split:
-
-| method | features / trainable params | test ROC-AUC |
-|---|---:|---:|
-| LR on mutation count | 1 | 0.771 |
-| LR on one-hot CDR-H3 | 200 | 0.897 |
-| ESM-2-650M + LoRA (r = 8) | 7.7 M | 0.901 |
-| **MLP(128) on one-hot** | 200 | **0.920** |
-
-A fine-tuned 650M-parameter PLM ties a logistic regression and *loses to a small MLP
-on the same 200 one-hot features* — the zero-shot finding surviving supervision.
-**Caveat:** this is a *random stratified* split (median nearest-train Hamming = 3;
-6.2% of test within d ≤ 1) — precisely the optimistic regime this benchmark warns
-about, so treat it as an upper bound. Re-running it under the distance-aware
-protocol is the open question. Artifact: `results/mason_finetune_baselines.csv`
-via `training/leak_check.py`.
-
-**Also in progress:** manuscript draft (workshop methods contribution).
-**Planned:** benchmark expansion to further combinatorial antibody datasets.
+Q1–Q4 are complete and reproducible from committed scores. **In progress:**
+manuscript draft (workshop methods contribution). **Planned:** benchmark
+expansion to further combinatorial antibody datasets.
 
 ## Limitations
 
-Single target (trastuzumab / HER2). Strict improver tier is n = 5, validated against a robust relaxed tier with bootstrap CIs. Structure arm is fixed-backbone only. Zero-shot PLM scores model CDR-H3 variation only; HCDR1/2 variation (20% of variants, 0% of improvers) is unmodeled; conclusions re-verified on the exactly-scored subset. Full log in `validation_checklist.md`.
+Single target (trastuzumab / HER2). The strict improver tier is n = 5, which is
+reported with its interval and is too small to carry a claim — the headline rests
+on the n = 42 tier. The structure arm is fixed-backbone only. Zero-shot PLM
+scores model CDR-H3 variation only; HCDR1/2 variation (20% of variants, 0% of
+improvers) is unmodelled, and conclusions were re-verified on the exactly-scored
+subset. Full log in `validation_checklist.md`.
 
 ## License
 
-Code and computed outputs: MIT. Third-party datasets and model weights are not covered and not redistributed.
+Code and computed outputs: MIT. Third-party datasets and model weights are not
+covered and not redistributed.
