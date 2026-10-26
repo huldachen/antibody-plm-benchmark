@@ -43,7 +43,7 @@ Standard benchmarks inflate apparent PLM performance on combinatorial CDR data i
 
 ## Key findings
 
-**Two priors, only one enriches improvers.** Mutation count (MW p = 3.2×10⁻⁷) and BLOSUM62 (p = 1.9×10⁻³) significantly enrich improvers; antibody PLMs do not. PLMs encode a germline-naturalness prior, not the parent-distance prior that matters here. The effect **flips with the task**: on Mason, the same PLMs *enrich* binders (p ≈ 10⁻⁴) because binders there are low-mutation.
+**Two priors, only one enriches improvers.** Mutation count (MW p = 3.2×10⁻⁷) and BLOSUM62 (p = 1.9×10⁻³) significantly enrich improvers; antibody PLMs do not. PLMs encode a germline-naturalness prior, not the parent-distance prior that matters here. The effect **flips with the task**: on Mason, the same PLMs *enrich* binders (n = 154 binders of 500 variants; p ≈ 10⁻⁴) because binders there are low-mutation.
 
 **Structure reduces to counting.** AntiFold on the trastuzumab–HER2 crystal out-enriches BLOSUM, yet its correlation vanishes once mutation count is controlled (raw ρ = +0.135 → partial ρ = +0.003, n.s.; ρ = −0.71 with mutation count). Whether reported inverse-folding advantages are partly a mutation-count artifact is a testable question.
 
