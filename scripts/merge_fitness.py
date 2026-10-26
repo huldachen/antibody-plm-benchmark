@@ -28,15 +28,18 @@ unchanged.
 
 import argparse
 import os
+import sys
 
 import numpy as np
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 
 def merge_absci(raw_path: str) -> None:
-    scored = pd.read_csv(os.path.join(ROOT, "results", "absci_all_scored.csv"))
+    scored = pd.read_csv(result_path("absci_all_scored.csv"))
     raw = pd.read_csv(raw_path)
     if "HCDR3" not in raw.columns or "Kd_nM" not in raw.columns:
         raise SystemExit("Absci raw file must contain columns 'HCDR3' and 'Kd_nM'.")
@@ -44,14 +47,14 @@ def merge_absci(raw_path: str) -> None:
     df = scored.merge(raw, on="HCDR3", how="left")
     df["neg_log_Kd"] = -np.log10(df["Kd_nM"] * 1e-9)   # Kd in nM -> neg_log_Kd (M)
     df["Binder"] = df["Kd_nM"].notna().astype(int)
-    out = os.path.join(ROOT, "results", "absci_all_scored.csv")
+    out = result_path("absci_all_scored.csv")
     df.to_csv(out, index=False)
     print(f"Restored Kd_nM/neg_log_Kd/Binder for {int(df['Binder'].sum())} binders "
           f"({len(df)} rows) -> {os.path.relpath(out, ROOT)}")
 
 
 def merge_kydab(raw_path: str) -> None:
-    scored = pd.read_csv(os.path.join(ROOT, "results", "kydab_scores.csv"))
+    scored = pd.read_csv(result_path("kydab_scores.csv"))
     raw = pd.read_csv(raw_path)
     key = "heavy_cdr3" if "heavy_cdr3" in raw.columns else "ID"
     kd_col = next((c for c in raw.columns if c.lower() in
@@ -61,7 +64,7 @@ def merge_kydab(raw_path: str) -> None:
                          "and a Kd column.")
     raw = raw[[key, kd_col]].drop_duplicates(key).rename(columns={kd_col: "neg_log_Kd"})
     df = scored.merge(raw, on=key, how="left")
-    out = os.path.join(ROOT, "results", "kydab_scores.csv")
+    out = result_path("kydab_scores.csv")
     df.to_csv(out, index=False)
     print(f"Restored neg_log_Kd for {int(df['neg_log_Kd'].notna().sum())} rows -> "
           f"{os.path.relpath(out, ROOT)}")
@@ -71,14 +74,14 @@ MASON_SRC_COLS = ["AgClass", "CountPos", "CountNeg", "FracPos", "FracNeg", "LogE
 
 
 def merge_mason(raw_path: str) -> None:
-    scored = pd.read_csv(os.path.join(ROOT, "results", "mason_all_scored.csv"))
+    scored = pd.read_csv(result_path("mason_all_scored.csv"))
     raw = pd.read_csv(raw_path)
     if "AASeq" not in raw.columns or "AgClass" not in raw.columns:
         raise SystemExit("Mason raw file must contain columns 'AASeq' and 'AgClass'.")
     cols = ["AASeq"] + [c for c in MASON_SRC_COLS if c in raw.columns]
     raw = raw[cols].drop_duplicates("AASeq")
     df = scored.merge(raw, on="AASeq", how="left")
-    out = os.path.join(ROOT, "results", "mason_all_scored.csv")
+    out = result_path("mason_all_scored.csv")
     df.to_csv(out, index=False)
     print(f"Restored {', '.join(cols[1:])} for {int(df['AgClass'].notna().sum())} "
           f"rows -> {os.path.relpath(out, ROOT)}")

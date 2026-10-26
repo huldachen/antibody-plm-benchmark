@@ -30,6 +30,7 @@ import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.metrics import (
     spearman_correlation, kendall_tau,
@@ -41,7 +42,7 @@ from evaluation.metrics import (
 DATASETS = {
     "mason": {
         "name": "Mason CDR-H3",
-        "scored_path": os.path.join(PROJECT_ROOT, "results", "mason_all_scored.csv"),
+        "scored_path": result_path("mason_all_scored.csv"),
         "seq_col": "AASeq",
         "fitness_col": "LogEnrichment",
         "label_col": "AgClass",
@@ -50,7 +51,7 @@ DATASETS = {
     },
     "absci": {
         "name": "Absci HER2 SPR",
-        "scored_path": os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv"),
+        "scored_path": result_path("absci_all_scored.csv"),
         "seq_col": "HCDR3",
         "fitness_col": "neg_log_Kd",
         "label_col": "Binder",
@@ -307,8 +308,7 @@ def main():
         print(f"Resolved WT fitness ({cfg['fitness_col']}) = {wt_fit:.10f}")
         rank_df, n_imp, n_tot = improver_rank_diagnostic(df, cfg, wt_fit)
         print_improver_diagnostic(rank_df, n_imp, n_tot)
-        rank_path = os.path.join(PROJECT_ROOT, "results",
-                                 f"{args.dataset}_improver_ranks.csv")
+        rank_path = result_path(f"{args.dataset}_improver_ranks.csv")
         rank_df.to_csv(rank_path, index=False)
         print(f"Improver-rank diagnostic saved → {rank_path}")
 
@@ -316,8 +316,7 @@ def main():
         results.to_csv(args.save, index=False)
         print(f"Saved metrics table → {args.save}")
     else:
-        default = os.path.join(PROJECT_ROOT, "results",
-                               f"{args.dataset}_v2_metrics.csv")
+        default = result_path(f"{args.dataset}_v2_metrics.csv")
         results.to_csv(default, index=False)
         print(f"Saved metrics table → {default}")
 

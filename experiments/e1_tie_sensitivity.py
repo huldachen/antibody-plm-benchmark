@@ -35,13 +35,14 @@ from scipy.stats import mannwhitneyu
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import (  # noqa: E402
     improver_mask, near_improver_mask,
 )
 
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_e1_tie_sensitivity.csv")
+SCORED_CSV = result_path("absci_all_scored.csv")
+OUT_CSV = result_path("absci_e1_tie_sensitivity.csv")
 
 MODELS = [
     ("MutCount", "MutCount_score"),

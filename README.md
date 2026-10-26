@@ -89,15 +89,18 @@ vs MutCount 0.65 ± 0.03 at d ≥ 5, a +0.06 gap, down from +0.36 at d = 1.
 LoRA fine-tuning of ESM-2-650M on Mason binder classification does not beat
 one-hot baselines on the same split:
 
-| method | features / trainable params | test ROC-AUC |
-|---|---:|---:|
-| LR on mutation count | 1 | 0.771 |
-| LR on one-hot CDR-H3 | 200 | 0.897 |
-| ESM-2-650M + LoRA (r = 8) | 7.7 M | 0.901 |
-| **MLP(128) on one-hot** | 200 | **0.920** |
+| method | features / trainable params | test ROC-AUC | vs LoRA (paired DeLong) |
+|---|---:|---:|---|
+| LR on mutation count | 1 | 0.771 | LoRA better, p = 3×10⁻⁵² |
+| LR on one-hot CDR-H3 | 200 | 0.897 | **tie**, p = 0.87 |
+| ESM-2-650M + LoRA (r = 8) | 7.7 M trainable | 0.896 | — |
+| **MLP(128) on one-hot** | 200 | **0.920** | **MLP better, p = 1×10⁻⁹** |
 
-A fine-tuned 650M-parameter PLM ties a logistic regression and does not beat a
-small MLP on the same 200 one-hot features. **Caveat:** this is a *random
+A fine-tuned 650M-parameter PLM is **statistically indistinguishable** from a
+logistic regression on 200 one-hot features (p = 0.87) and **significantly worse**
+than a 128-unit MLP on those same features (p = 1.4×10⁻⁹). It does beat the
+mutation-count baseline — supervision buys something, just not more than one-hot
+encoding does. **Caveat:** this is a *random
 stratified* split (median nearest-train Hamming = 3) — the optimistic regime
 this benchmark warns about, so treat it as an upper bound. Re-running it under
 the distance-aware protocol is the open question.

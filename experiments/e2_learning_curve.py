@@ -34,12 +34,13 @@ import matplotlib.pyplot as plt
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.lowN_protocol import run_learning_curve, summarize  # noqa: E402
 from experiments.absci_fewshot_common import load_absci, base_scorers  # noqa: E402
 
-OUT_LONG = os.path.join(PROJECT_ROOT, "results", "absci_e2_lowN.csv")
-OUT_SUM = os.path.join(PROJECT_ROOT, "results", "absci_e2_lowN_summary.csv")
+OUT_LONG = result_path("absci_e2_lowN.csv")
+OUT_SUM = result_path("absci_e2_lowN_summary.csv")
 OUT_PNG = os.path.join(PROJECT_ROOT, "figures", "figE2_learning_curves.png")
 
 NS = (20, 50, 100, 200, 500)

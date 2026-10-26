@@ -25,12 +25,13 @@ from sklearn.pipeline import make_pipeline
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import improver_mask, near_improver_mask  # noqa: E402
 
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-ESM2_NPY = os.path.join(PROJECT_ROOT, "results", "absci_esm2_emb.npy")
-ABLANG_NPY = os.path.join(PROJECT_ROOT, "results", "absci_ablang_emb.npy")
+SCORED_CSV = result_path("absci_all_scored.csv")
+ESM2_NPY = result_path("absci_esm2_emb.npy")
+ABLANG_NPY = result_path("absci_ablang_emb.npy")
 AA = "ACDEFGHIKLMNPQRSTVWY"
 AA_IDX = {a: i for i, a in enumerate(AA)}
 

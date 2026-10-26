@@ -23,14 +23,15 @@ import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import (  # noqa: E402
     evaluate_improver_retrieval, near_improver_mask,
 )
 
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-ANTIFOLD_CSV = os.path.join(PROJECT_ROOT, "results", "absci_antifold_crystal.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_e4_crystal_metrics.csv")
+SCORED_CSV = result_path("absci_all_scored.csv")
+ANTIFOLD_CSV = result_path("absci_antifold_crystal.csv")
+OUT_CSV = result_path("absci_e4_crystal_metrics.csv")
 
 FITNESS_COL = "neg_log_Kd"
 KS = (10, 30, 100)

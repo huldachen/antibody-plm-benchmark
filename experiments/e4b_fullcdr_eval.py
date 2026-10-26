@@ -24,6 +24,7 @@ from scipy.sparse.csgraph import connected_components
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import one_hot, ridge_scorer, SCORED_CSV  # noqa: E402
 from evaluation.improver_metrics import (  # noqa: E402
@@ -31,9 +32,9 @@ from evaluation.improver_metrics import (  # noqa: E402
 )
 from evaluation.lowN_protocol import run_learning_curve_fixed, summarize  # noqa: E402
 
-FULLCDR = os.path.join(PROJECT_ROOT, "results", "absci_antifold_fullcdr.csv")
-CRYSTAL = os.path.join(PROJECT_ROOT, "results", "absci_antifold_crystal.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_e4b_fullcdr.csv")
+FULLCDR = result_path("absci_antifold_fullcdr.csv")
+CRYSTAL = result_path("absci_antifold_crystal.csv")
+OUT_CSV = result_path("absci_e4b_fullcdr.csv")
 CDRS = ["HCDR1", "HCDR2", "HCDR3"]
 WT = {"HCDR1": "GFNIKDTY", "HCDR2": "IYPTNGYT", "HCDR3": "SRWGGDGFYAMDY"}
 
@@ -151,7 +152,7 @@ def main() -> None:
               f"Mut={m['mean']:.2f}±{m['ci']:.2f}  gap={gap:+.2f}±{gap_ci:.2f} [{verdict}]")
 
     # (C) inflation factor from E2g full-CDR rho (d=1 vs d>=5).
-    rc = pd.read_csv(os.path.join(PROJECT_ROOT, "results", "absci_fullcdr_recheck.csv"))
+    rc = pd.read_csv(result_path("absci_fullcdr_recheck.csv"))
     print("\n(C) Correlation-inflation factor (rho d=1 / rho d>=5):")
     infl_full, infl_h3 = 0.68 / 0.48, 0.81 / 0.46
     for k, v in [("rho_d1_fullCDR", 0.68), ("rho_dge5_fullCDR", 0.48),

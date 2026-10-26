@@ -28,10 +28,11 @@ from matplotlib.patches import Patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import beat_parent_enrichment  # noqa: E402
 
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
+SCORED_CSV = result_path("absci_all_scored.csv")
 OUT_PNG = os.path.join(PROJECT_ROOT, "figures", "figE1_improver_antirank.png")
 
 FITNESS_COL = "neg_log_Kd"

@@ -104,7 +104,7 @@ def compute_metrics(preds: np.ndarray, labels: np.ndarray, is_classification: bo
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, is_classification: bool) -> dict:
+def evaluate(model, loader, device, is_classification: bool, return_preds: bool = False):
     model.eval()
     all_preds, all_labels, total_loss, n = [], [], 0.0, 0
     for batch in loader:
@@ -120,13 +120,12 @@ def evaluate(model, loader, device, is_classification: bool) -> dict:
     labels = np.concatenate(all_labels, axis=0)
     metrics = compute_metrics(preds, labels, is_classification)
     metrics["loss"] = total_loss / max(n, 1)
-    # Keep the raw per-sample outputs so downstream comparisons (e.g. a paired
-    # DeLong test against the one-hot baselines) remain possible WITHOUT the
-    # adapter. Predictions are a few KB and never go stale; adapter weights are
-    # hundreds of MB, gitignored, and in practice get deleted -- which is
-    # exactly how the first published run became impossible to re-test.
-    metrics["_preds"] = preds
-    metrics["_labels"] = labels
+    # The metrics dict stays scalars-only: the per-epoch logger rounds every
+    # value, so smuggling arrays through it breaks training (it did). Callers
+    # that want the raw per-sample outputs -- to keep a run comparable later
+    # without the adapter weights -- ask for them explicitly.
+    if return_preds:
+        return metrics, preds, labels
     return metrics
 
 
@@ -214,6 +213,26 @@ def main() -> int:
     total = sum(p.numel() for p in model.parameters())
     print(f"[lora] trainable={trainable:,} ({100*trainable/total:.2f}% of {total:,})")
 
+    # Verify the adapter actually attached. PEFT silently ignores any entry in
+    # target_modules that matches no module, and `esm` is not in PEFT's built-in
+    # mapping -- so a config copied from a Llama/Mistral example
+    # (target_modules=["q_proj","v_proj"]) binds to NOTHING on ESM-2, whose
+    # attention projections are named query/key/value. Training then quietly
+    # degrades to frozen-embeddings-plus-head, and every downstream comparison
+    # is an artifact. Counting the adapters is the only honest confirmation.
+    adapted = sorted({n.split(".lora_")[0] for n, _ in model.named_parameters()
+                      if "lora_" in n})
+    head_only = sum(p.numel() for n, p in model.named_parameters()
+                    if p.requires_grad and "lora_" not in n)
+    print(f"[lora] adapters attached to {len(adapted)} modules; "
+          f"non-adapter trainable (head etc.) = {head_only:,}")
+    if not adapted:
+        raise RuntimeError(
+            f"LoRA attached to NO modules. target_modules={LORA_TARGETS_ESM2} "
+            f"matched nothing in {args.model_name}. ESM-2 uses "
+            f"query/key/value, not q_proj/v_proj."
+        )
+
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad], lr=args.lr
     )
@@ -280,7 +299,8 @@ def main() -> int:
 
         row = {"epoch": epoch, "train_loss": round(train_loss, 6), "elapsed_s": round(elapsed, 1)}
         for k, v in val_metrics.items():
-            row[f"val_{k}"] = round(v, 6)
+            if isinstance(v, (int, float)):      # scalars only; never assume
+                row[f"val_{k}"] = round(v, 6)
         if log_writer is None:
             log_writer = csv.DictWriter(log_fh, fieldnames=list(row.keys()))
             log_writer.writeheader()
@@ -299,9 +319,8 @@ def main() -> int:
     log_fh.close()
 
     # Final test eval using last-epoch weights (best is also saved separately)
-    test_metrics = evaluate(model, test_loader, device, spec.is_classification)
-    test_preds = test_metrics.pop("_preds")
-    test_labels = test_metrics.pop("_labels")
+    test_metrics, test_preds, test_labels = evaluate(
+        model, test_loader, device, spec.is_classification, return_preds=True)
     print(f"[test] {test_metrics}")
 
     # Persist per-sample test predictions BEFORE anything else: this is what

@@ -22,13 +22,14 @@ from scipy.stats import spearmanr
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import (  # noqa: E402
     beat_parent_enrichment, improver_retrieval_at_k,
 )
 
-SCORED = os.path.join(PROJECT_ROOT, "results", "mason_all_scored.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "mason_binder_retrieval.csv")
+SCORED = result_path("mason_all_scored.csv")
+OUT_CSV = result_path("mason_binder_retrieval.csv")
 KS = (30, 100)
 MODELS = [
     ("MutCount", "MutCount_score"),

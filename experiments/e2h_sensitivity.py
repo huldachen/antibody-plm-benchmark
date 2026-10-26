@@ -20,6 +20,7 @@ import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import load_absci, ridge_scorer  # noqa: E402
 from evaluation.improver_metrics import (  # noqa: E402
@@ -29,7 +30,7 @@ from evaluation.lowN_protocol import (  # noqa: E402
     fixed_eval_split, run_learning_curve_fixed, summarize,
 )
 
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_sensitivity.csv")
+OUT_CSV = result_path("absci_sensitivity.csv")
 ZERO_MODELS = [("MutCount", "MutCount_score"), ("BLOSUM62", "BLOSUM62_score"),
                ("ESM-2", "ESM2_score"), ("AbLang", "AbLang_score"),
                ("AntiBERTy", "AntiBERTy_score")]

@@ -28,13 +28,14 @@ from scipy.stats import rankdata, pearsonr, spearmanr
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import (  # noqa: E402
     improver_mask, near_improver_mask, beat_parent_enrichment,
 )
 
-SCORED = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_e1d_provenance.csv")
+SCORED = result_path("absci_all_scored.csv")
+OUT_CSV = result_path("absci_e1d_provenance.csv")
 WT = {"HCDR1": "GFNIKDTY", "HCDR2": "IYPTNGYT"}
 MODELS = [("MutCount", None), ("BLOSUM62", "BLOSUM62_score"),
           ("ESM-2", "ESM2_score"), ("AbLang", "AbLang_score"),

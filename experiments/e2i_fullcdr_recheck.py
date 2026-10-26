@@ -35,12 +35,13 @@ from sklearn.model_selection import StratifiedShuffleSplit
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import one_hot, ridge_scorer, SCORED_CSV  # noqa: E402
 from evaluation.improver_metrics import improver_mask, near_improver_mask  # noqa: E402
 from evaluation.lowN_protocol import run_learning_curve_fixed, summarize  # noqa: E402
 
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_fullcdr_recheck.csv")
+OUT_CSV = result_path("absci_fullcdr_recheck.csv")
 OUT_PNG = os.path.join(PROJECT_ROOT, "figures", "figE2i_fullcdr.png")
 NS = (20, 50, 100, 200, 500)
 N_SEEDS = 20

@@ -28,11 +28,12 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import numpy as np
 import pandas as pd
+from evaluation.paths import result_path  # noqa: E402
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
+SCORED_CSV = result_path("absci_all_scored.csv")
 PDB_DIR = os.path.join(PROJECT_ROOT, "structures", "pdb")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_antifold_crystal.csv")
+OUT_CSV = result_path("absci_antifold_crystal.csv")
 
 PDB_NAME = "1n8z"
 HCHAIN, LCHAIN = "B", "A"          # from fetch_and_inspect_1n8z.py

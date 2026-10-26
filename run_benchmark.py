@@ -35,6 +35,7 @@ import pandas as pd
 # Add project root to path
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from models.blosum import score_variants as blosum_score_variants
 from evaluation.metrics import spearman_correlation, auc_roc
@@ -366,10 +367,10 @@ def evaluate_all_models(df, score_cols, cfg):
 
 def save_results(df, results_df, score_cols, dataset_key, cfg):
     """Save all results."""
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(result_path(f"{dataset_key}_all_scored.csv")), exist_ok=True)
 
     # Save full scored dataset
-    scored_path = os.path.join(RESULTS_DIR, f"{dataset_key}_all_scored.csv")
+    scored_path = result_path(f"{dataset_key}_all_scored.csv")
     df.to_csv(scored_path, index=False)
     print(f"\nScored dataset saved: {scored_path}")
 
@@ -486,7 +487,7 @@ def main():
         beat_parent = v2_cfg.get("wt_fitness") is not None
         v2_results = evaluate_all(df_v2, v2_cfg, beat_parent=beat_parent)
         print_table(v2_results, v2_cfg, beat_parent=beat_parent)
-        v2_path = os.path.join(RESULTS_DIR, f"{args.dataset}_v2_metrics.csv")
+        v2_path = result_path(f"{args.dataset}_v2_metrics.csv")
         v2_results.to_csv(v2_path, index=False)
         print(f"v2 metrics saved: {v2_path}")
     except Exception as e:

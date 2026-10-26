@@ -22,11 +22,12 @@ import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import load_absci  # noqa: E402
 from evaluation.lowN_protocol import fixed_eval_split  # noqa: E402
 
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_e2e_leakage.csv")
+OUT_CSV = result_path("absci_e2e_leakage.csv")
 EVAL_FRAC = 0.40
 SPLIT_SEED = 0
 L = 13

@@ -21,11 +21,12 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import numpy as np
 import pandas as pd
+from evaluation.paths import result_path  # noqa: E402
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
+SCORED_CSV = result_path("absci_all_scored.csv")
 PDB_DIR = os.path.join(PROJECT_ROOT, "structures", "pdb")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_antifold_fullcdr.csv")
+OUT_CSV = result_path("absci_antifold_fullcdr.csv")
 
 PDB_NAME, HCHAIN, LCHAIN = "1n8z", "B", "A"
 WT = {"HCDR1": "GFNIKDTY", "HCDR2": "IYPTNGYT", "HCDR3": "SRWGGDGFYAMDY"}

@@ -32,6 +32,7 @@ from scipy.sparse import csr_matrix
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import load_absci, base_scorers  # noqa: E402
 from evaluation.lowN_protocol import run_learning_curve_fixed, summarize  # noqa: E402
@@ -43,9 +44,8 @@ EVAL_FRAC = 0.40
 # mutations from any training variant. CLI arg overrides (default 2 = strictest).
 D_LINK = int(sys.argv[1]) if len(sys.argv) > 1 else 2
 L = 13
-OUT_LONG = os.path.join(PROJECT_ROOT, "results", f"absci_e2f_distance_d{D_LINK}.csv")
-OUT_SUM = os.path.join(PROJECT_ROOT, "results",
-                       f"absci_e2f_distance_d{D_LINK}_summary.csv")
+OUT_LONG = result_path(f"absci_e2f_distance_d{D_LINK}.csv")
+OUT_SUM = result_path(f"absci_e2f_distance_d{D_LINK}_summary.csv")
 OUT_PNG = os.path.join(PROJECT_ROOT, "figures",
                        f"figE2f_distance_split_d{D_LINK}.png")
 STYLE = {

@@ -24,6 +24,7 @@ import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import (  # noqa: E402
     evaluate_improver_retrieval,
@@ -31,10 +32,9 @@ from evaluation.improver_metrics import (  # noqa: E402
     near_improver_mask,
 )
 
-SCORED_CSV = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_improver_metrics.csv")
-OUT_CSV_NEAR = os.path.join(PROJECT_ROOT, "results",
-                            "absci_near_improver_metrics.csv")
+SCORED_CSV = result_path("absci_all_scored.csv")
+OUT_CSV = result_path("absci_improver_metrics.csv")
+OUT_CSV_NEAR = result_path("absci_near_improver_metrics.csv")
 
 FITNESS_COL = "neg_log_Kd"
 MUTATION_COL = "NumMutations"

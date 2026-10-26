@@ -36,6 +36,7 @@ from sklearn.metrics import accuracy_score, matthews_corrcoef, roc_auc_score
 from sklearn.neural_network import MLPClassifier
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+from evaluation.paths import result_path  # noqa: E402
 from training.dataloader import load_dataframe, stratified_split  # noqa: E402
 
 
@@ -92,6 +93,7 @@ def fit_and_score(
     probs = clf.predict_proba(X_test)[:, 1]
     preds = (probs >= 0.5).astype(int)
     return {
+        "probs": probs,
         "label": label,
         "n_features": X_train.shape[1],
         "roc_auc": roc_auc_score(y_test, probs),
@@ -261,6 +263,55 @@ def main() -> int:
     else:
         print(f"{'(no LoRA checkpoint for this dataset yet)':<40s}")
 
+    # ---- Paired DeLong vs the LoRA run, when its predictions exist ----
+    # Per-model intervals do not test a difference between two correlated AUCs,
+    # and every model here is scored on the SAME test split. This needs only the
+    # saved test_predictions.csv, not the adapter weights -- which is the point
+    # of saving them.
+    delong_rows = []
+    ckpt_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
+    pred_file = None
+    if os.path.isdir(ckpt_dir):
+        cands = sorted(d for d in os.listdir(ckpt_dir)
+                       if d.startswith(f"{args.dataset}_cls_")
+                       and os.path.isfile(os.path.join(ckpt_dir, d, "test_predictions.csv")))
+        if cands:
+            pred_file = os.path.join(ckpt_dir, cands[-1], "test_predictions.csv")
+
+    if pred_file is None:
+        print("\n[delong] no saved LoRA test_predictions.csv - skipping paired tests")
+    else:
+        from evaluation.delong import delong_test
+        lora = pd.read_csv(pred_file).rename(columns={"score": "lora_score"})
+        frame = pd.DataFrame({seq_col: test_df[seq_col].to_numpy(),
+                              "y": test_df[label_col].to_numpy(int),
+                              "LR(MutCount)": res_mut["probs"],
+                              "LR(one-hot)": res_oh["probs"],
+                              "MLP(128) one-hot": res_mlp["probs"]})
+        merged = frame.merge(lora[[lora.columns[0], "lora_score"]],
+                             left_on=seq_col, right_on=lora.columns[0], how="inner")
+        if len(merged) != len(frame):
+            print(f"\n[delong] WARNING aligned {len(merged)}/{len(frame)} rows - "
+                  f"split mismatch, skipping")
+        else:
+            y = merged["y"].to_numpy(int)
+            lora_s = merged["lora_score"].to_numpy(float)
+            print(f"\n[delong] LoRA vs each baseline (paired, n={len(y)}, "
+                  f"n_pos={int(y.sum())}):")
+            for name in ("LR(MutCount)", "LR(one-hot)", "MLP(128) one-hot"):
+                d = delong_test(y, lora_s, merged[name].to_numpy(float))
+                sig = ("***" if d["p"] < 1e-3 else "**" if d["p"] < 0.01
+                       else "*" if d["p"] < 0.05 else "n.s.")
+                delong_rows.append({"comparison": f"LoRA vs {name}",
+                                    "auc_lora": d["auc_a"], "auc_other": d["auc_b"],
+                                    "delta": d["delta"], "se_delta": d["se_delta"],
+                                    "p_delong": d["p"], "significant_95": d["p"] < 0.05})
+                print(f"    LoRA {d['auc_a']:.4f}  vs  {name:<20} {d['auc_b']:.4f}   "
+                      f"delta={d['delta']:+.4f}  se={d['se_delta']:.4f}  "
+                      f"p={d['p']:.3e}  {sig}")
+            pd.DataFrame(delong_rows).to_csv(
+                result_path(f"{args.dataset}_finetune_delong.csv"), index=False)
+
     # ---- Persist: no headline number may live only in stdout (DEC-012 rule 3).
     # Every row carries the split diagnostics, so the metric can never be read
     # apart from the caveat that earns it: this is a RANDOM stratified split, the
@@ -282,8 +333,7 @@ def main() -> int:
          "roc_auc": r["roc_auc"], "accuracy": r["accuracy"], "mcc": r["mcc"]}
         for r in scored
     ]
-    out_csv = os.path.join(project_root, "results",
-                           f"{args.dataset}_finetune_baselines.csv")
+    out_csv = result_path(f"{args.dataset}_finetune_baselines.csv")
     pd.DataFrame(out_rows).to_csv(out_csv, index=False)
     print(f"\nSaved {len(out_rows)} rows -> "
           f"{os.path.relpath(out_csv, project_root)}")

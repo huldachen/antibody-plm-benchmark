@@ -24,9 +24,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from evaluation.paths import result_path  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "results", "absci_mason_mechanism.csv")
+SRC = result_path("absci_mason_mechanism.csv")
 OUT = os.path.join(ROOT, "figures", "F5_label_definition.png")
 
 MUT = ("MutCount", "#111111")

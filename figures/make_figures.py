@@ -28,14 +28,15 @@ from sklearn.model_selection import StratifiedShuffleSplit
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(HERE)
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import one_hot, ridge_scorer  # noqa: E402
 from evaluation.improver_metrics import (  # noqa: E402
     improver_mask, near_improver_mask, beat_parent_enrichment,
 )
 
-SCORED = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-AF_FULL = os.path.join(PROJECT_ROOT, "results", "absci_antifold_fullcdr.csv")
+SCORED = result_path("absci_all_scored.csv")
+AF_FULL = result_path("absci_antifold_fullcdr.csv")
 CDRS = ["HCDR1", "HCDR2", "HCDR3"]
 WT = {"HCDR1": "GFNIKDTY", "HCDR2": "IYPTNGYT", "HCDR3": "SRWGGDGFYAMDY"}
 ORANGE, BLUE, GREY, GREEN, RED, PURPLE = (

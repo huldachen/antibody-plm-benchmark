@@ -36,10 +36,11 @@ from sklearn.model_selection import StratifiedShuffleSplit
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from experiments.absci_fewshot_common import load_absci, ridge_scorer  # noqa: E402
 
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_e2g_dist_stratified.csv")
+OUT_CSV = result_path("absci_e2g_dist_stratified.csv")
 OUT_PNG = os.path.join(PROJECT_ROOT, "figures", "figE2g_distance_stratified.png")
 
 N_TRAIN = 200

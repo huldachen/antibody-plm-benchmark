@@ -32,11 +32,11 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 from scipy import stats
+from evaluation.paths import result_path  # noqa: E402
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 KYDAB_CSV = os.path.join(PROJECT_ROOT, "data", "processed", "kydab_paired_with_affinity.csv")
-RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
-SCORES_CACHE = os.path.join(RESULTS_DIR, "kydab_scores.csv")
+SCORES_CACHE = result_path("kydab_scores.csv")
 
 ANTIGEN_COL = "project"
 KD_COL = "neg_log_Kd"
@@ -578,7 +578,7 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=DEFAULT_SEED)
     args = p.parse_args()
 
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(result_path("kydab_scores.csv")), exist_ok=True)
     if args.scorers == "all":
         sc_names = list(SCORER_REGISTRY)
     else:
@@ -647,13 +647,13 @@ def main() -> int:
     null_df = random_null_per_antigen(df, n_shuffles=DEFAULT_NULL_SHUFFLES, seed=args.seed)
 
     sfx = args.out_suffix
-    per_antigen.to_csv(os.path.join(RESULTS_DIR, f"kydab_eval_per_antigen{sfx}.csv"), index=False)
-    pooled.to_csv(os.path.join(RESULTS_DIR, f"kydab_eval_pooled{sfx}.csv"), index=False)
-    null_df.to_csv(os.path.join(RESULTS_DIR, f"kydab_eval_null{sfx}.csv"), index=False)
+    per_antigen.to_csv(result_path(f"kydab_eval_per_antigen{sfx}.csv"), index=False)
+    pooled.to_csv(result_path(f"kydab_eval_pooled{sfx}.csv"), index=False)
+    null_df.to_csv(result_path(f"kydab_eval_null{sfx}.csv"), index=False)
 
     print_pretty(per_antigen, pooled, null_df)
     print(f"\n[save] per-antigen / pooled / null tables -> "
-          f"{RESULTS_DIR}/kydab_eval_*{sfx}.csv")
+          f"{os.path.dirname(result_path('kydab_scores.csv'))}/kydab_eval_*{sfx}.csv")
     return 0
 
 

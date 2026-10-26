@@ -30,13 +30,14 @@ from sklearn.metrics import roc_auc_score
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 
 from evaluation.improver_metrics import improver_mask, near_improver_mask  # noqa: E402
 from evaluation.delong import delong_test  # noqa: E402
 
-ABSCI = os.path.join(PROJECT_ROOT, "results", "absci_all_scored.csv")
-MASON = os.path.join(PROJECT_ROOT, "results", "mason_all_scored.csv")
-OUT_CSV = os.path.join(PROJECT_ROOT, "results", "absci_mason_mechanism.csv")
+ABSCI = result_path("absci_all_scored.csv")
+MASON = result_path("mason_all_scored.csv")
+OUT_CSV = result_path("absci_mason_mechanism.csv")
 OUT_PNG = os.path.join(PROJECT_ROOT, "figures", "figMech_plm_vs_mutcount.png")
 PLMS = [("ESM-2", "ESM2_score", "#C0392B"),
         ("AbLang", "AbLang_score", "#1F6FB2"),
