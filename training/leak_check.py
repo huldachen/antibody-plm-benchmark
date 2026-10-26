@@ -37,7 +37,8 @@ from sklearn.neural_network import MLPClassifier
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 from evaluation.paths import result_path  # noqa: E402
-from training.dataloader import load_dataframe, stratified_split  # noqa: E402
+from training.dataloader import (  # noqa: E402
+    load_dataframe, stratified_split, distance_split)
 
 
 AA_VOCAB = "ACDEFGHIKLMNPQRSTVWY"
@@ -135,7 +136,7 @@ def _trainable_params(run_dir: str, cfg: dict) -> int | None:
     return None
 
 
-def lora_test_metrics(dataset: str) -> dict | None:
+def lora_test_metrics(dataset: str, test_seqs=None, seq_col=None) -> dict | None:
     """Read LoRA test metrics from the most recent matching checkpoint dir."""
     base = os.path.join(os.path.dirname(__file__), "checkpoints")
     if not os.path.isdir(base):
@@ -146,6 +147,23 @@ def lora_test_metrics(dataset: str) -> dict | None:
     )
     if not candidates:
         return None
+    # Several runs may exist under different splits. Picking sorted()[-1] once
+    # reported a random-split AUC beside distance-split baselines, because
+    # "_rerun" sorts after "_dist2". Select the run whose SAVED PREDICTIONS match
+    # the test set actually in hand; anything else is not comparable.
+    if test_seqs is not None:
+        want = set(test_seqs)
+        matched = None
+        for d in candidates:
+            pf = os.path.join(base, d, "test_predictions.csv")
+            if os.path.isfile(pf):
+                col = pd.read_csv(pf, nrows=0).columns[0]
+                if set(pd.read_csv(pf)[col]) == want:
+                    matched = d
+                    break
+        if matched is None:
+            return None
+        candidates = [matched]
     run_dir = os.path.join(base, candidates[-1])
     with open(os.path.join(run_dir, "config.json")) as f:
         cfg = json.load(f)
@@ -164,11 +182,19 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Leak / baseline diagnostic for v3 fine-tuning")
     p.add_argument("--dataset", choices=["mason", "absci"], required=True)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--split", choices=["random", "distance"], default="random",
+                   help="random stratified (optimistic) or leave-cluster-out")
+    p.add_argument("--d-link", type=int, default=2,
+                   help="Hamming linkage threshold for --split distance")
     args = p.parse_args()
 
     print(f"[load] {args.dataset}/classification, same seed as training ({args.seed})")
     df, spec = load_dataframe(args.dataset, "classification")
-    train_df, val_df, test_df = stratified_split(df, spec, seed=args.seed)
+    if args.split == "distance":
+        train_df, val_df, test_df = distance_split(
+            df, spec, d_link=args.d_link, seed=args.seed)
+    else:
+        train_df, val_df, test_df = stratified_split(df, spec, seed=args.seed)
     print(f"       train={len(train_df)} val={len(val_df)} test={len(test_df)}")
 
     seq_col = spec.seq_col
@@ -244,7 +270,10 @@ def main() -> int:
     print(f"       {res_mlp}  (n_iter={mlp.n_iter_})")
 
     # ---- LoRA result if checkpoint exists ----
-    res_lora = lora_test_metrics(args.dataset)
+    res_lora = lora_test_metrics(args.dataset, test_df[seq_col], seq_col)
+    if res_lora is None:
+        print(f"\n[lora] no checkpoint whose saved predictions match this "
+              f"'{args.split}' split - excluding the LoRA row")
 
     # ---- Summary ----
     title = f"SUMMARY — {args.dataset} classification, test n={len(test_df)}, seed={args.seed}"
@@ -272,11 +301,14 @@ def main() -> int:
     ckpt_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
     pred_file = None
     if os.path.isdir(ckpt_dir):
-        cands = sorted(d for d in os.listdir(ckpt_dir)
-                       if d.startswith(f"{args.dataset}_cls_")
-                       and os.path.isfile(os.path.join(ckpt_dir, d, "test_predictions.csv")))
-        if cands:
-            pred_file = os.path.join(ckpt_dir, cands[-1], "test_predictions.csv")
+        want = set(test_df[seq_col])
+        for d in sorted(os.listdir(ckpt_dir)):
+            pf = os.path.join(ckpt_dir, d, "test_predictions.csv")
+            if d.startswith(f"{args.dataset}_cls_") and os.path.isfile(pf):
+                col = pd.read_csv(pf, nrows=0).columns[0]
+                if set(pd.read_csv(pf)[col]) == want:
+                    pred_file = pf
+                    break
 
     if pred_file is None:
         print("\n[delong] no saved LoRA test_predictions.csv - skipping paired tests")
@@ -310,7 +342,8 @@ def main() -> int:
                       f"delta={d['delta']:+.4f}  se={d['se_delta']:.4f}  "
                       f"p={d['p']:.3e}  {sig}")
             pd.DataFrame(delong_rows).to_csv(
-                result_path(f"{args.dataset}_finetune_delong.csv"), index=False)
+                result_path(f"{args.dataset}_finetune_delong"
+                f"{'' if args.split=='random' else '_distance'}.csv"), index=False)
 
     # ---- Persist: no headline number may live only in stdout (DEC-012 rule 3).
     # Every row carries the split diagnostics, so the metric can never be read
@@ -322,7 +355,8 @@ def main() -> int:
         "seed": args.seed,
         "n_train": len(train_df),
         "n_test": len(test_df),
-        "split_type": "random_stratified",
+        "split_type": ("random_stratified" if args.split == "random"
+                       else f"distance_aware_d{args.d_link}"),
         "train_inter_test": leak_total,
         "median_nearest_train_hamming": float(np.median(min_d)),
         "frac_test_d_le_1": float((min_d <= 1).mean()),
@@ -333,7 +367,8 @@ def main() -> int:
          "roc_auc": r["roc_auc"], "accuracy": r["accuracy"], "mcc": r["mcc"]}
         for r in scored
     ]
-    out_csv = result_path(f"{args.dataset}_finetune_baselines.csv")
+    out_csv = result_path(f"{args.dataset}_finetune_baselines"
+                               f"{'' if args.split=='random' else '_distance'}.csv")
     pd.DataFrame(out_rows).to_csv(out_csv, index=False)
     print(f"\nSaved {len(out_rows)} rows -> "
           f"{os.path.relpath(out_csv, project_root)}")

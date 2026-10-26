@@ -47,6 +47,7 @@ from training.dataloader import (
     label_summary,
     load_dataframe,
     stratified_split,
+    distance_split,
 )
 
 
@@ -142,6 +143,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--max-length", type=int, default=32)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--split", choices=["random", "distance"], default="random",
+                   help="random stratified (optimistic) or leave-cluster-out")
+    p.add_argument("--d-link", type=int, default=2,
+                   help="Hamming linkage threshold for --split distance")
     p.add_argument("--output-dir", required=False)
     p.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default="auto",
                    help="Compute device. 'auto' picks cuda > mps > cpu.")
@@ -171,7 +176,11 @@ def main() -> int:
     df, spec = load_dataframe(args.dataset, args.task)
     print(f"[data] {args.dataset}/{args.task} loaded: {label_summary(df, spec)}")
 
-    train_df, val_df, test_df = stratified_split(df, spec, seed=args.seed)
+    if args.split == "distance":
+        train_df, val_df, test_df = distance_split(
+            df, spec, d_link=args.d_link, seed=args.seed)
+    else:
+        train_df, val_df, test_df = stratified_split(df, spec, seed=args.seed)
     print(f"[split] train={len(train_df)} val={len(val_df)} test={len(test_df)}")
 
     # Smoke-test reduction: keep 32 train + 16 val

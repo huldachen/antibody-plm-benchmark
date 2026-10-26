@@ -1,0 +1,5 @@
+dataset,seed,n_train,n_test,split_type,train_inter_test,median_nearest_train_hamming,frac_test_d_le_1,method,n_features,roc_auc,accuracy,mcc
+mason,42,29113,3639,distance_aware_d2,0,3.0,0.0,LR(MutCount),1,0.6609746132355702,0.8087386644682605,0.15600258143243403
+mason,42,29113,3639,distance_aware_d2,0,3.0,0.0,LR(one-hot),200,0.8462665223776764,0.8609508106622699,0.42912816944599663
+mason,42,29113,3639,distance_aware_d2,0,3.0,0.0,MLP(128) one-hot,200,0.869879305204342,0.879087661445452,0.5138096254835873
+mason,42,29113,3639,distance_aware_d2,0,3.0,0.0,ESM-2 LoRA r=8 lr=0.0001 (mason_cls_r8_lr1e-4_e5_dist2),7724802,0.8341142238761471,0.8609508106622699,0.4752168255463133

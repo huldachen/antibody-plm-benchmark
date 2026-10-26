@@ -89,21 +89,43 @@ vs MutCount 0.65 ± 0.03 at d ≥ 5, a +0.06 gap, down from +0.36 at d = 1.
 LoRA fine-tuning of ESM-2-650M on Mason binder classification does not beat
 one-hot baselines on the same split:
 
-| method | features / trainable params | test ROC-AUC | vs LoRA (paired DeLong) |
+**Random (optimistic) split** — n = 3640, 1128 positives:
+
+| method | features / trainable | ROC-AUC | vs LoRA (paired DeLong) |
 |---|---:|---:|---|
 | LR on mutation count | 1 | 0.771 | LoRA better, p = 3×10⁻⁵² |
-| LR on one-hot CDR-H3 | 200 | 0.897 | **tie**, p = 0.87 |
-| ESM-2-650M + LoRA (r = 8) | 7.7 M trainable | 0.896 | — |
-| **MLP(128) on one-hot** | 200 | **0.920** | **MLP better, p = 1×10⁻⁹** |
+| LR on one-hot CDR-H3 | 200 | 0.897 | tie, p = 0.87 |
+| ESM-2-650M + LoRA (r = 8) | 7.7 M | 0.896 | — |
+| **MLP(128) on one-hot** | 200 | **0.920** | **MLP better, p = 1.4×10⁻⁹** |
 
-A fine-tuned 650M-parameter PLM is **statistically indistinguishable** from a
-logistic regression on 200 one-hot features (p = 0.87) and **significantly worse**
-than a 128-unit MLP on those same features (p = 1.4×10⁻⁹). It does beat the
-mutation-count baseline — supervision buys something, just not more than one-hot
-encoding does. **Caveat:** this is a *random
-stratified* split (median nearest-train Hamming = 3) — the optimistic regime
-this benchmark warns about, so treat it as an upper bound. Re-running it under
-the distance-aware protocol is the open question.
+**Distance-aware split** — every test sequence ≥ 3 substitutions from every
+training sequence (leave-cluster-out at Hamming ≤ 2); n = 3639, 595 positives:
+
+| method | ROC-AUC | change | vs LoRA (paired DeLong) |
+|---|---:|---:|---|
+| LR on mutation count | 0.661 | −0.110 | LoRA better, p = 2×10⁻⁴⁰ |
+| LR on one-hot CDR-H3 | 0.846 | −0.051 | tie, p = 0.115 |
+| ESM-2-650M + LoRA (r = 8) | 0.834 | **−0.062** | — |
+| **MLP(128) on one-hot** | **0.870** | −0.050 | **MLP better, p = 1.2×10⁻⁷** |
+
+**The conclusion is robust to the evaluation regime, which is the point.** Under
+both splits a fine-tuned 650M-parameter PLM is statistically indistinguishable
+from a logistic regression on 200 one-hot features, and significantly worse than
+a 128-unit MLP on those same features. It does beat the mutation-count baseline,
+so supervision buys something — just not more than one-hot encoding does.
+
+Removing leakage costs every method, and costs the PLM **most** (−0.062 vs −0.050
+for the MLP): the pretrained representation did not generalise to novel sequences
+better than 200 binary features did. The gap to the MLP widens from −0.024 to
+−0.036.
+
+*Caveat, stated rather than buried:* the distance-aware split shifts class balance
+(train 34.6% positive, test 16.4%) because binders are low-mutation and cluster
+into the giant component assigned to training. AUROC is prevalence-robust so the
+comparisons within each split hold, but absolute values are **not** comparable
+across the two tables — which is why they are shown separately. Test metrics use
+last-epoch weights. Artifacts: `results/mason/mason_finetune_baselines{,_distance}.csv`
+and `..._delong{,_distance}.csv` via `training/leak_check.py`.
 
 ## The evaluation protocol
 

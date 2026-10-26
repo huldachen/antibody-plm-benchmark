@@ -200,3 +200,99 @@ def label_summary(df: pd.DataFrame, spec: DatasetSpec) -> str:
         return f"n={len(df)} class_counts={counts}"
     arr = df[spec.label_col].to_numpy()
     return f"n={len(df)} mean={arr.mean():.3f} std={arr.std():.3f} min={arr.min():.3f} max={arr.max():.3f}"
+
+AA_VOCAB = "ACDEFGHIKLMNPQRSTVWY"
+
+
+def _onehot(seqs, length: int) -> np.ndarray:
+    """(N, length*20) uint8 one-hot, for Hamming via dot product."""
+    idx = {a: i for i, a in enumerate(AA_VOCAB)}
+    out = np.zeros((len(seqs), length * 20), dtype=np.uint8)
+    for r, s in enumerate(seqs):
+        for c, aa in enumerate(s[:length]):
+            j = idx.get(aa)
+            if j is not None:
+                out[r, c * 20 + j] = 1
+    return out
+
+
+def distance_split(
+    df: pd.DataFrame,
+    spec: DatasetSpec,
+    d_link: int = 1,
+    val_frac: float = 0.1,
+    test_frac: float = 0.1,
+    seed: int = 42,
+    chunk: int = 2000,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Leave-cluster-out split: no test sequence within `d_link` of any train one.
+
+    A random split of a combinatorial CDR library puts near-duplicates of training
+    variants into the test set, so a model can memorise rather than generalise --
+    the failure mode this benchmark exists to measure. Here sequences are clustered
+    into connected components under Hamming <= d_link (single linkage) and WHOLE
+    components are assigned to train / val / test, which guarantees every test
+    sequence is at least d_link+1 substitutions from every training sequence.
+
+    Hamming is computed as L - (A @ A.T) on a one-hot encoding, in row chunks so
+    the full N x N matrix is never materialised.
+
+    Parameters
+    ----------
+    d_link : int
+        Linkage threshold. d_link=1 clusters exact-and-1-apart sequences.
+    seed : int
+        Seeds the component shuffle, so the split is reproducible.
+
+    Returns
+    -------
+    tuple of pd.DataFrame
+        (train, val, test)
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    seqs = df[spec.seq_col].tolist()
+    L = len(seqs[0])
+    A = _onehot(seqs, L)
+    n = len(seqs)
+
+    rows, cols = [], []
+    for start in range(0, n, chunk):
+        stop = min(start + chunk, n)
+        matches = A[start:stop].astype(np.int16) @ A.T.astype(np.int16)
+        ham = L - matches
+        r, c = np.nonzero(ham <= d_link)
+        r = r + start
+        keep = r < c                      # upper triangle only
+        rows.append(r[keep]); cols.append(c[keep])
+    rows = np.concatenate(rows) if rows else np.array([], dtype=int)
+    cols = np.concatenate(cols) if cols else np.array([], dtype=int)
+    g = coo_matrix((np.ones(len(rows), dtype=np.uint8), (rows, cols)), shape=(n, n))
+    n_comp, labels = connected_components(g, directed=False)
+
+    rng = np.random.default_rng(seed)
+    order = rng.permutation(n_comp)
+    sizes = np.bincount(labels, minlength=n_comp)
+    want_test, want_val = int(test_frac * n), int(val_frac * n)
+
+    # A component larger than the whole test budget must go to train, or the
+    # split silently inverts. At d_link=2 this library percolates into a giant
+    # core (~30% of sequences); sending it to eval would mean training on the
+    # periphery and testing on the core, a distribution shift masquerading as a
+    # generalisation test. Train-on-core / test-on-periphery is the honest
+    # direction, and the asymmetry is reported rather than hidden.
+    assign, got_test, got_val = {}, 0, 0
+    for c in order:
+        if got_test + sizes[c] <= want_test:
+            assign[c] = "test"; got_test += sizes[c]
+        elif got_val + sizes[c] <= want_val:
+            assign[c] = "val"; got_val += sizes[c]
+        else:
+            assign[c] = "train"
+    part = np.array([assign[c] for c in labels])
+
+    out = tuple(df[part == k].reset_index(drop=True) for k in ("train", "val", "test"))
+    print(f"[split] distance-aware d_link={d_link}: {n_comp} components; "
+          f"train={len(out[0])} val={len(out[1])} test={len(out[2])}")
+    return out
