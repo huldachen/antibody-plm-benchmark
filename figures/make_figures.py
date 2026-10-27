@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """
-Figures F1-F4 (full-CDR basis).
+Figures F1-F4 (full-CDR basis) -- the single generator for both trees.
 
-Reads the committed results CSVs and writes the four figures next to this file,
-in figures/. Run from the repo root in the analysis (plm) env:
+Reads the committed results CSVs and writes the four figures to --out-dir
+(default: next to this file). Run from anywhere, in the analysis (plm) env:
 
-    python figures/make_figures.py
+    python figures/make_figures.py                      # -> figures/
+    python paper/figures/make_paper_figures.py          # -> paper/figures/
 
-  F1  leakage characterization        -> figures/F1_leakage.png
-  F2  zero-shot two-prior divergence  -> figures/F2_zeroshot_two_prior.png
-  F3  structure reduces to counting   -> figures/F3_structure_counting.png
-  F4  correlation vs discovery        -> figures/F4_correlation_vs_discovery.png
+  F1  leakage characterization        -> F1_leakage.png
+  F2  zero-shot two-prior divergence  -> F2_zeroshot_two_prior.png
+  F3  structure reduces to counting   -> F3_structure_counting.png
+  F4  correlation vs discovery        -> F4_correlation_vs_discovery.png
+
+This file used to exist twice -- once per tree -- differing in one line of
+PROJECT_ROOT nesting depth and otherwise only in docstring, producing
+byte-identical PNGs. Two implementations of one decision, with no way to tell
+which had been edited last (DEC-012 10). The root is now discovered rather than
+hard-coded, so one file works at either depth.
 """
 
+import argparse
 import os
 import sys
 
@@ -26,7 +34,39 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedShuffleSplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(HERE)
+
+
+def _find_project_root(start: str) -> str:
+    """Walk up from `start` to the directory holding both results/ and evaluation/.
+
+    Discovering the root is what lets one file serve two locations (figures/ and
+    paper/figures/). Raises rather than returning a wrong guess: a silently wrong
+    root would surface later as a confusing ImportError or an empty figure.
+
+    Parameters
+    ----------
+    start : str
+        Absolute directory to start the upward walk from.
+
+    Returns
+    -------
+    str
+        Absolute path of the repository root.
+    """
+    cur = start
+    while True:
+        if all(os.path.isdir(os.path.join(cur, d)) for d in ("results", "evaluation")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            raise RuntimeError(
+                f"no project root above {start}: expected an ancestor directory "
+                "containing both results/ and evaluation/")
+        cur = parent
+
+
+PROJECT_ROOT = _find_project_root(HERE)
+OUT_DIR = HERE          # overridden by --out-dir in main()
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
 
@@ -41,6 +81,19 @@ CDRS = ["HCDR1", "HCDR2", "HCDR3"]
 WT = {"HCDR1": "GFNIKDTY", "HCDR2": "IYPTNGYT", "HCDR3": "SRWGGDGFYAMDY"}
 ORANGE, BLUE, GREY, GREEN, RED, PURPLE = (
     "#E8820C", "#1F6FB2", "#9AA0A6", "#2E8B57", "#C0392B", "#7B4FB5")
+
+
+def _save(fig, name: str) -> None:
+    """Write one figure into OUT_DIR at the single publication DPI.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Figure to write.
+    name : str
+        Output filename, e.g. ``"F1_leakage.png"``.
+    """
+    fig.savefig(os.path.join(OUT_DIR, name), dpi=300, bbox_inches="tight")
 
 
 def _load():
@@ -85,7 +138,7 @@ def fig1_leakage(df, X_full, L_full):
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     fig.tight_layout()
-    fig.savefig(os.path.join(HERE, "F1_leakage.png"), dpi=300, bbox_inches="tight")
+    _save(fig, "F1_leakage.png")
     plt.close(fig)
 
 
@@ -125,8 +178,7 @@ def fig2_two_prior(df, fit, parent):
     fig.suptitle("F2. Two edit-distance-like priors: parent-distance baselines "
                  "enrich improvers; the PLMs do not", fontsize=12, weight="bold", y=1.02)
     fig.tight_layout()
-    fig.savefig(os.path.join(HERE, "F2_zeroshot_two_prior.png"), dpi=300,
-                bbox_inches="tight")
+    _save(fig, "F2_zeroshot_two_prior.png")
     plt.close(fig)
 
 
@@ -164,8 +216,7 @@ def fig3_structure(df):
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     fig.tight_layout()
-    fig.savefig(os.path.join(HERE, "F3_structure_counting.png"), dpi=300,
-                bbox_inches="tight")
+    _save(fig, "F3_structure_counting.png")
     plt.close(fig)
 
 
@@ -231,19 +282,29 @@ def fig4_corr_vs_discovery(df, fit, parent, X_full, L_full):
                  "one that discovers (improver retrieval)", fontsize=12,
                  weight="bold", y=1.02)
     fig.tight_layout()
-    fig.savefig(os.path.join(HERE, "F4_correlation_vs_discovery.png"), dpi=300,
-                bbox_inches="tight")
+    _save(fig, "F4_correlation_vs_discovery.png")
     plt.close(fig)
 
 
-def main():
-    os.makedirs(HERE, exist_ok=True)
+def main() -> None:
+    """Parse --out-dir and write F1-F4 there."""
+    ap = argparse.ArgumentParser(
+        description="Generate figures F1-F4 from the committed results CSVs.")
+    ap.add_argument("--out-dir", default=HERE,
+                    help="directory to write the PNGs into "
+                         "(default: next to this script)")
+    args = ap.parse_args()
+    global OUT_DIR
+    OUT_DIR = os.path.abspath(args.out_dir)
+    os.makedirs(OUT_DIR, exist_ok=True)
     df, fit, parent, X_full, L_full = _load()
     print("F1 leakage ...");            fig1_leakage(df, X_full, L_full)
     print("F2 two-prior ...");          fig2_two_prior(df, fit, parent)
     print("F3 structure=counting ...."); fig3_structure(df)
     print("F4 correlation vs discovery ..."); fig4_corr_vs_discovery(df, fit, parent, X_full, L_full)
-    print("Saved F1-F4 to figures/")
+    shown = (os.path.relpath(OUT_DIR, PROJECT_ROOT)
+             if OUT_DIR.startswith(PROJECT_ROOT + os.sep) else OUT_DIR)
+    print(f"Saved F1-F4 -> {shown}/")
 
 
 if __name__ == "__main__":

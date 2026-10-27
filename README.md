@@ -173,7 +173,8 @@ log is in `docs/validation_checklist.md`.
 ## Reproducibility
 
 Every number comes from a committed script, and metrics recompute from the
-scored CSVs without re-running any model. `docs/validation_checklist.md` names the
+scored CSVs without re-running any model. Comments cite `DEC-NNN` design
+decisions; `docs/CODEMAP.md` lists the ones referenced from published code. `docs/validation_checklist.md` names the
 artifact behind each claim; `docs/CODEMAP.md` documents every script, its output, and
 its role. Structure tools live in a separate conda env
 (`environment_antifold.yml`) because their pinned dependencies conflict with the

@@ -25,6 +25,24 @@ scripts/merge_fitness.py ▶ restores measured values into the committed scored 
 
 ---
 
+## Design decisions (`DEC-NNN`)
+
+Code comments cite short decision IDs. The decisions live in the project's dated
+design log, which is not published; each entry records a choice, the alternatives
+considered and why one was taken. The ones referenced from published code are:
+
+| ID | Decision |
+|---|---|
+| DEC-003 | Fine-tune on raw CDR-H3 sequences rather than the variant embedded in the full VH, so the supervised arm sees exactly what the zero-shot arm scored. |
+| DEC-004 | A logistic regression on 200 one-hot features dissolves the apparent LoRA signal — the finding that reframed the fine-tuning arm from "PLM works" to "PLM ties a trivial encoder". |
+| DEC-007 | Use tie-corrected (midrank) Mann–Whitney for **every** rank statistic, after a strict-tier enrichment p-value turned out to rest on a score tie (0.028 → 0.075). |
+| DEC-008 | Non-binders enter the few-shot regression at a censored floor (one log unit below the weakest measured binder) rather than being dropped, which would bias the target distribution upward. |
+| DEC-009 | Low-N learning curves use one **fixed** held-out evaluation split across all budgets and seeds, so curves differ only in training size. |
+| DEC-010 | Structure arm scope: fixed-backbone inverse folding on the 1N8Z crystal, scored on the full CDR basis. |
+| DEC-011 | Structure and fine-tuning tools get isolated conda envs. Mixing conda and pip numeric stacks ships two OpenMP runtimes and aborts the process; the documented workaround warns of silently incorrect results, so it is refused rather than used. |
+| DEC-012 | Release hygiene for this repository: computed columns only in `results/`, every published number backed by a committed artifact, no absolute paths, no third-party measured values. |
+
+
 ## Zero-shot enrichment — Q1 (`experiments/e1*`)
 
 | Script | Role | Output |
