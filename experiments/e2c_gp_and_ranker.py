@@ -12,7 +12,7 @@ Methods: MutCount (0 labels), Random, Ridge(compact) [best Group B so far],
 GP(compact), Ridge(parent-Δ), C1-Rank(parent-Δ) [Group C, our method].
 
 Run:
-    python experiments/e2c_group_c.py
+    python experiments/e2c_gp_and_ranker.py
 Outputs:
     results/absci_e2c_groupc.csv, results/absci_e2c_groupc_summary.csv
     figures/figE2c_group_c.png

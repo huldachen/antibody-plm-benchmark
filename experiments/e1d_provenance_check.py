@@ -29,6 +29,7 @@ from scipy.stats import rankdata, pearsonr, spearmanr
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
+from evaluation.metrics import partial_spearman  # noqa: E402
 
 from evaluation.improver_metrics import (  # noqa: E402
     improver_mask, near_improver_mask, beat_parent_enrichment,
@@ -42,12 +43,6 @@ MODELS = [("MutCount", None), ("BLOSUM62", "BLOSUM62_score"),
           ("AntiBERTy", "AntiBERTy_score")]
 
 
-def partial_spearman(x, y, z):
-    rx, ry, rz = rankdata(x), rankdata(y), rankdata(z)
-    def resid(a, b):
-        B = np.c_[np.ones_like(b), b]
-        return a - B @ np.linalg.lstsq(B, a, rcond=None)[0]
-    return pearsonr(resid(rx, rz), resid(ry, rz))
 
 
 def enrich(df, mask, name, col):

@@ -64,7 +64,7 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
   binders → near-improvers: MutCount 0.634 [0.602, 0.667] → 0.723 [0.652, 0.790]
   while AbLang 0.565 [0.531, 0.599] → 0.449 [0.373, 0.529].
 - **Artifact:** `absci_mason_mechanism.csv` (now carries `*_lo` / `*_hi` per model),
-  from `e1c_mechanism.py`.
+  from `e1c_label_definition.py`.
 
 ---
 
@@ -213,7 +213,7 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
   cutoff (5% / 20%).
 - **Question fixed:** *Is the near-tier result an artifact of the 10% threshold?*
 - **Outcome:** Conclusions hold at 5%, 10%, and 20% cutoffs. No threshold sensitivity.
-- **Artifact:** `absci_sensitivity.csv` (from `e2h_sensitivity.py`).
+- **Artifact:** `absci_sensitivity.csv` (from `e2h_cutoff_sensitivity.py`).
 
 ---
 

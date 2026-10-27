@@ -14,7 +14,7 @@ DEFINITION changes), so they are internally controlled; Mason extends the range
 (0.5, 0.5), PLM "enrichment" is a low-mutation-count proxy whose sign is set by
 the target, not a task-independent signal.
 
-Run (plm env): python experiments/e1c_mechanism.py
+Run (plm env): python experiments/e1c_label_definition.py
 Outputs: results/absci_mason_mechanism.csv, figures/figMech_plm_vs_mutcount.png
 """
 

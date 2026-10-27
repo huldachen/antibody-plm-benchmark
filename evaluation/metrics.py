@@ -137,6 +137,39 @@ def best_f1(predicted_score, binary_label):
     }
 
 
+def partial_spearman(x, y, z):
+    """Spearman correlation of x and y, controlling for z.
+
+    Computed as the Pearson correlation of the residuals left after regressing
+    the RANKS of x and y on the ranks of z. This is the rank analogue of partial
+    correlation, and it is the statistic behind every "does the signal survive
+    controlling for mutation count?" claim in this benchmark.
+
+    Lived in three experiment scripts as three byte-wise near-identical copies
+    until 2026-10-27. A statistic that decides published conclusions needs one
+    definition, or the copies drift and no one can say which produced a number.
+
+    Parameters
+    ----------
+    x, y : array_like
+        Variables to correlate.
+    z : array_like
+        Variable to control for (typically mutation count).
+
+    Returns
+    -------
+    tuple of float
+        ``(rho, p)`` — partial Spearman correlation and its two-sided p-value.
+    """
+    rx, ry, rz = stats.rankdata(x), stats.rankdata(y), stats.rankdata(z)
+
+    def resid(a, b):
+        B = np.c_[np.ones_like(b), b]
+        return a - B @ np.linalg.lstsq(B, a, rcond=None)[0]
+
+    return stats.pearsonr(resid(rx, rz), resid(ry, rz))
+
+
 def kendall_tau(predicted, observed):
     """
     Kendall's tau-b rank correlation (handles ties).

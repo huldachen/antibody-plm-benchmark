@@ -47,13 +47,16 @@ considered and why one was taken. The ones referenced from published code are:
 
 | Script | Role | Output |
 |---|---|---|
+| `data/download_mason.py` ⟲ | Fetch + process the Mason 2021 FACS library into the CDR-H3 table (sequence, mutation count, label). Source data is not redistributed — see `data/raw/README.md`. | `data/processed/mason_cdrh3_enrichment.csv` |
+| `data/download_absci.py` ⟲ | Same for the Absci HER2 SPR set (CDR sequences, Kd, binder flag). | `data/processed/absci_her2_spr.csv` |
+| `data/download_kydab.py` ⟲ | Same for the KyDab multi-target panel used by the generalisation check. | `data/processed/kydab_paired_with_affinity.csv` |
 | `run_benchmark.py` ⟲ | Score every model (BLOSUM/ESM-2/AbLang/AntiBERTy) over a dataset. Produces the scored tables everything else reads. Needs torch + weights; **not needed** if you use the committed scores. | `results/absci_all_scored.csv`, `results/mason_all_scored.csv` |
 | `experiments/e1_antirank.py` ▶ | Improver enrichment / anti-ranking, strict + near tiers (the headline). Mann–Whitney with midrank ties, P@K, Recall@K, fold-improvement. | `absci_improver_metrics.csv`, `absci_near_improver_metrics.csv` |
 | `experiments/e1b_mason_replication.py` ✓ | Second-assay check on Mason (binder retrieval) — the task-dependence result. Shows PLM enrichment **flips** when retrieving binders vs improvers. | `mason_binder_retrieval.csv` |
-| `experiments/e1c_mechanism.py` ✓ | Is PLM enrichment just a low-mutation-count proxy? Correlates PLM AUROC with MutCount AUROC across 4 positive-set conditions. | `absci_mason_mechanism.csv` |
+| `experiments/e1c_label_definition.py` ✓ | Is PLM enrichment just a low-mutation-count proxy? Correlates PLM AUROC with MutCount AUROC across 4 positive-set conditions. | `absci_mason_mechanism.csv` |
 | `experiments/e1d_provenance_check.py` ✓ | Re-run E1 on the exactly-scored (HCDR3-only) subset — the ESM-2 partial-ρ demotion. Confirms CDR-H3–only results hold when HCDR1/2 variants are excluded. | `absci_e1d_provenance.csv` |
 | `experiments/e1_tie_sensitivity.py` ✓ | Tie-consistent (midrank) vs stable-sort enrichment p-values. Diagnostic that moved strict-tier p from 0.028 → 0.075. | `absci_e1_tie_sensitivity.csv` |
-| `experiments/e1_figure.py` ⊘ | Early E1 anti-ranking figure; superseded by F2 in `make_figures.py`. Kept as the analysis record. | `figures/figE1_improver_antirank.png` |
+| `experiments/e1_antirank_figure.py` ⊘ | Early E1 anti-ranking figure; superseded by F2 in `make_figures.py`. Kept as the analysis record. | `figures/figE1_improver_antirank.png` |
 
 ## Low-N supervision & leakage — Q3 (`experiments/e2*`)
 
@@ -61,12 +64,12 @@ considered and why one was taken. The ones referenced from published code are:
 |---|---|---|
 | `experiments/e2_learning_curve.py` ▶ | Few-shot learning curve (Ridge on one-hot/compact vs MutCount) with sliding-window splits. | `absci_e2_lowN.csv`, `absci_e2_lowN_summary.csv` |
 | `experiments/e2b_fixed_test.py` ✓ | Fixed held-out test protocol (all 5 strict improvers always in eval). Clean generalization test. | `absci_e2b_fixed.csv`, `absci_e2b_fixed_summary.csv` |
-| `experiments/e2c_group_c.py` ✓ | Additional scorer family (GP, parent-anchored Ridge, C1-Rank pairwise ranker). | `absci_e2c_groupc.csv`, `absci_e2c_groupc_summary.csv` |
+| `experiments/e2c_gp_and_ranker.py` ✓ | Additional scorer family (GP, parent-anchored Ridge, C1-Rank pairwise ranker). | `absci_e2c_groupc.csv`, `absci_e2c_groupc_summary.csv` |
 | `experiments/e2d_embeddings.py` ✓ | Embedding-based supervised scorers (ESM-2 / AbLang features). Requires cached `.npy` from `extract_embeddings.py`. | `absci_e2d_emb.csv`, `absci_e2d_emb_summary.csv` |
 | `experiments/e2e_leakage_diagnostic.py` ✓ | Quantify eval→train near-duplicate leakage in CDR-H3 Hamming distance (Fig F1). | `absci_e2e_leakage.csv` |
 | `experiments/e2f_distance_split.py` ▶ | Leave-cluster-out distance-aware split — the keystone validity check. Guarantees no near-duplicate leakage. | `absci_e2f_distance_d{1,2}.csv`, `absci_e2f_distance_d{1,2}_summary.csv` |
 | `experiments/e2g_distance_stratified.py` ✓ | Metric vs min-distance-to-train, seed-averaged — the correlation-vs-discovery reconciliation (Fig F4). Reports both Spearman ρ and near-AUROC per distance bin. | `absci_e2g_dist_stratified.csv` |
-| `experiments/e2h_sensitivity.py` ✓ | Near-tier cutoff (5/10/20%) + censoring-floor sensitivity. | `absci_sensitivity.csv` |
+| `experiments/e2h_cutoff_sensitivity.py` ✓ | Near-tier cutoff (5/10/20%) + censoring-floor sensitivity. | `absci_sensitivity.csv` |
 | `experiments/e2i_fullcdr_recheck.py` ✓ | Full-CDR (vs CDR-H3-only) re-run of leakage/curve — the foundational correction that moved leakage from 39%→27%. | `absci_fullcdr_recheck.csv` |
 
 ## Structure arm — Q2 (`structures/`, `experiments/e4*`)
@@ -118,6 +121,9 @@ stratified split, an upper bound, not a distance-aware result.*
 | `evaluation/improver_metrics.py` | 13× | Improver / near-improver masks, tie-corrected enrichment (midrank MW), P@K / Recall@K, fold-improvement. |
 | `evaluation/lowN_protocol.py` | 9× | Stratified splits, fixed-test splits, learning-curve runners, summaries with CIs. |
 | `evaluation/metrics.py` | 16× | v2 metric suite (Spearman, Kendall, AUROC, AUPRC, P@K, best F1). |
+| `evaluation/paths.py` | 29× | Resolves a result filename to its grouped location (`results/<dataset>/<name>.csv`), falling back to the legacy flat path if the grouped one is absent. Single source of truth for the results layout, so regrouping does not touch 29 call sites. |
+| `evaluation/metrics.py` → `partial_spearman` | 3× | Spearman of x and y controlling for z, as Pearson on rank-residuals — the statistic behind every "does the signal survive controlling for mutation count?" claim. Was three copies in three scripts until 2026-10-27. |
+| `evaluation/delong.py` | 2× | Paired DeLong test for two **correlated** ROC AUCs (fast midrank algorithm). Per-model bootstrap CIs do not test a difference between two models scored on the same split; this does. Returns delta, its standard error, z and p. |
 | `evaluation/stratify.py` ⊘ | — (none) | IMGT/ANARCI CDR-vs-framework position assignment. **Not on the current path** — the Mason/Absci datasets vary only within CDRs, so stratification is trivial; retained for extending the benchmark to framework-mutation datasets. |
 | `models/blosum.py` | `run_benchmark.py` | BLOSUM62 parental-anchored substitution scorer (sum of BLOSUM62 scores at mutated positions vs WT). |
 | `models/esm2.py` | `run_benchmark.py` | ESM-2 (650M) masked-marginal scorer — masks each mutated position in full-VH context, sums log-odds vs WT. |

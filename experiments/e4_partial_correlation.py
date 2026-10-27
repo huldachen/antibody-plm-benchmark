@@ -23,6 +23,7 @@ from scipy.stats import rankdata, pearsonr, spearmanr
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
+from evaluation.metrics import partial_spearman  # noqa: E402
 
 SCORED_CSV = result_path("absci_all_scored.csv")
 ANTIFOLD_CSV = result_path("absci_antifold_crystal.csv")
@@ -35,20 +36,6 @@ MODELS = [
     ("ESM-2", "ESM2_score"),
 ]
 
-
-def _resid_on(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Residual of a after linear regression on b (with intercept)."""
-    B = np.c_[np.ones_like(b), b]
-    coef, _, _, _ = np.linalg.lstsq(B, a, rcond=None)
-    return a - B @ coef
-
-
-def partial_spearman(x, y, z):
-    """Spearman(x, y) controlling for z = Pearson on rank-residuals."""
-    rx, ry, rz = rankdata(x), rankdata(y), rankdata(z)
-    ex, ey = _resid_on(rx, rz), _resid_on(ry, rz)
-    r, p = pearsonr(ex, ey)
-    return r, p
 
 
 def main() -> None:

@@ -25,6 +25,7 @@ from scipy.sparse.csgraph import connected_components
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
+from evaluation.metrics import partial_spearman  # noqa: E402
 
 from experiments.absci_fewshot_common import one_hot, ridge_scorer, SCORED_CSV  # noqa: E402
 from evaluation.improver_metrics import (  # noqa: E402
@@ -39,12 +40,6 @@ CDRS = ["HCDR1", "HCDR2", "HCDR3"]
 WT = {"HCDR1": "GFNIKDTY", "HCDR2": "IYPTNGYT", "HCDR3": "SRWGGDGFYAMDY"}
 
 
-def partial_spearman(x, y, z):
-    rx, ry, rz = rankdata(x), rankdata(y), rankdata(z)
-    def resid(a, b):
-        B = np.c_[np.ones_like(b), b]
-        return a - B @ np.linalg.lstsq(B, a, rcond=None)[0]
-    return pearsonr(resid(rx, rz), resid(ry, rz))
 
 
 def main() -> None:

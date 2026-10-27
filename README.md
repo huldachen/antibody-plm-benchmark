@@ -178,7 +178,7 @@ conda env create -f environment_antifold.yml   # optional: AntiFold (isolated pi
 python scripts/merge_fitness.py absci --raw <your absci table>   # restore measured values
 
 python experiments/e1_antirank.py             # zero-shot enrichment
-python experiments/e1c_mechanism.py           # the label-definition result (F5)
+python experiments/e1c_label_definition.py           # the label-definition result (F5)
 python experiments/e2f_distance_split.py      # leakage-free supervised
 python experiments/e4b_fullcdr_eval.py        # structure partial-ρ
 python training/leak_check.py --dataset mason --split distance --d-link 2

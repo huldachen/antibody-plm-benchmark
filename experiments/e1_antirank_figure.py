@@ -11,7 +11,7 @@ can never drift from results/absci_improver_metrics.csv:
      improvers, red = anti-ranks them, with the p=0.05 significance threshold.
 
 Run:
-    python experiments/e1_figure.py
+    python experiments/e1_antirank_figure.py
 Output:
     figures/figE1_improver_antirank.png
 """

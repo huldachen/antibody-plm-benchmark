@@ -8,7 +8,7 @@ Sensitivity checks (reviewer m4/m5) — near-tier cutoff and censoring floor.
     (Ridge strict Recall@100 > MutCount on the d>=2 distance split) hold for
     floors {min-0.5, min-1, min-2} log units?
 
-Run (plm env): python experiments/e2h_sensitivity.py
+Run (plm env): python experiments/e2h_cutoff_sensitivity.py
 Output: results/absci_sensitivity.csv, stdout.
 """
 
