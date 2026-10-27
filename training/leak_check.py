@@ -43,6 +43,7 @@ from training.dataloader import (  # noqa: E402
 
 AA_VOCAB = "ACDEFGHIKLMNPQRSTVWY"
 AA2INT = {a: i for i, a in enumerate(AA_VOCAB)}
+CKPT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
 
 
 def encode_int(seqs: list[str], length: int) -> np.ndarray:
@@ -136,41 +137,67 @@ def _trainable_params(run_dir: str, cfg: dict) -> int | None:
     return None
 
 
-def lora_test_metrics(dataset: str, test_seqs=None, seq_col=None) -> dict | None:
-    """Read LoRA test metrics from the most recent matching checkpoint dir."""
-    base = os.path.join(os.path.dirname(__file__), "checkpoints")
-    if not os.path.isdir(base):
+def select_run_dir(dataset: str, test_seqs) -> str | None:
+    """Pick the checkpoint whose SAVED PREDICTIONS match the test set in hand.
+
+    Several runs coexist under different splits, so "newest" is not a usable
+    rule: picking ``sorted()[-1]`` once printed a random-split AUC beside
+    distance-split baselines, because ``_rerun`` sorts after ``_dist2``. Worse,
+    the summary row and the paired DeLong test each resolved the checkpoint
+    themselves, so a divergence between the two scans would have reported one
+    run's AUC with another run's p-value. This is now the single rule, called
+    once per invocation and shared by both -- identity of the compared run is an
+    invariant, not a coincidence.
+
+    Parameters
+    ----------
+    dataset : str
+        Dataset key, matching the ``<dataset>_cls_*`` checkpoint prefix.
+    test_seqs : iterable of str
+        The test-split sequences the baselines were just scored on.
+
+    Returns
+    -------
+    str or None
+        Checkpoint directory name, or None when no saved run matches.
+    """
+    if not os.path.isdir(CKPT_DIR):
         return None
-    candidates = sorted(
-        d for d in os.listdir(base)
-        if d.startswith(f"{dataset}_cls_") and os.path.isfile(os.path.join(base, d, "config.json"))
-    )
-    if not candidates:
-        return None
-    # Several runs may exist under different splits. Picking sorted()[-1] once
-    # reported a random-split AUC beside distance-split baselines, because
-    # "_rerun" sorts after "_dist2". Select the run whose SAVED PREDICTIONS match
-    # the test set actually in hand; anything else is not comparable.
-    if test_seqs is not None:
-        want = set(test_seqs)
-        matched = None
-        for d in candidates:
-            pf = os.path.join(base, d, "test_predictions.csv")
-            if os.path.isfile(pf):
-                col = pd.read_csv(pf, nrows=0).columns[0]
-                if set(pd.read_csv(pf)[col]) == want:
-                    matched = d
-                    break
-        if matched is None:
-            return None
-        candidates = [matched]
-    run_dir = os.path.join(base, candidates[-1])
+    want = set(test_seqs)
+    for d in sorted(os.listdir(CKPT_DIR)):
+        if not d.startswith(f"{dataset}_cls_"):
+            continue
+        run = os.path.join(CKPT_DIR, d)
+        pred_file = os.path.join(run, "test_predictions.csv")
+        if not (os.path.isfile(pred_file)
+                and os.path.isfile(os.path.join(run, "config.json"))):
+            continue
+        col = pd.read_csv(pred_file, nrows=0).columns[0]
+        if set(pd.read_csv(pred_file)[col]) == want:
+            return d
+    return None
+
+
+def lora_test_metrics(run_dir_name: str) -> dict:
+    """Read the saved test metrics for one checkpoint directory.
+
+    Parameters
+    ----------
+    run_dir_name : str
+        Checkpoint directory name, as returned by :func:`select_run_dir`.
+
+    Returns
+    -------
+    dict
+        Summary-table row: label, trainable-parameter count, ROC-AUC, accuracy, MCC.
+    """
+    run_dir = os.path.join(CKPT_DIR, run_dir_name)
     with open(os.path.join(run_dir, "config.json")) as f:
         cfg = json.load(f)
     args = cfg.get("args", {})
     tm = cfg.get("test_metrics", {})
     return {
-        "label": f"ESM-2 LoRA r={args.get('lora_rank')} lr={args.get('lr'):g} ({candidates[-1]})",
+        "label": f"ESM-2 LoRA r={args.get('lora_rank')} lr={args.get('lr'):g} ({run_dir_name})",
         "n_features": _trainable_params(run_dir, cfg),
         "roc_auc": tm.get("roc_auc"),
         "accuracy": tm.get("accuracy"),
@@ -269,11 +296,14 @@ def main() -> int:
     res_mlp = fit_and_score(mlp, X_train_oh, y_train, X_test_oh, y_test, "MLP(128) one-hot")
     print(f"       {res_mlp}  (n_iter={mlp.n_iter_})")
 
-    # ---- LoRA result if checkpoint exists ----
-    res_lora = lora_test_metrics(args.dataset, test_df[seq_col], seq_col)
-    if res_lora is None:
+    # ---- LoRA result if a checkpoint matches THIS split ----
+    run_dir_name = select_run_dir(args.dataset, test_df[seq_col])
+    res_lora = None if run_dir_name is None else lora_test_metrics(run_dir_name)
+    if run_dir_name is None:
         print(f"\n[lora] no checkpoint whose saved predictions match this "
               f"'{args.split}' split - excluding the LoRA row")
+    else:
+        print(f"\n[lora] matched checkpoint: {run_dir_name}")
 
     # ---- Summary ----
     title = f"SUMMARY — {args.dataset} classification, test n={len(test_df)}, seed={args.seed}"
@@ -298,17 +328,8 @@ def main() -> int:
     # saved test_predictions.csv, not the adapter weights -- which is the point
     # of saving them.
     delong_rows = []
-    ckpt_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
-    pred_file = None
-    if os.path.isdir(ckpt_dir):
-        want = set(test_df[seq_col])
-        for d in sorted(os.listdir(ckpt_dir)):
-            pf = os.path.join(ckpt_dir, d, "test_predictions.csv")
-            if d.startswith(f"{args.dataset}_cls_") and os.path.isfile(pf):
-                col = pd.read_csv(pf, nrows=0).columns[0]
-                if set(pd.read_csv(pf)[col]) == want:
-                    pred_file = pf
-                    break
+    pred_file = (None if run_dir_name is None
+                 else os.path.join(CKPT_DIR, run_dir_name, "test_predictions.csv"))
 
     if pred_file is None:
         print("\n[delong] no saved LoRA test_predictions.csv - skipping paired tests")
@@ -346,9 +367,10 @@ def main() -> int:
                 f"{'' if args.split=='random' else '_distance'}.csv"), index=False)
 
     # ---- Persist: no headline number may live only in stdout (DEC-012 rule 3).
-    # Every row carries the split diagnostics, so the metric can never be read
-    # apart from the caveat that earns it: this is a RANDOM stratified split, the
-    # optimistic regime this benchmark exists to warn about.
+    # Every row carries the split diagnostics (split_type, train-test overlap,
+    # nearest-train Hamming), so the metric can never be read apart from the
+    # caveat that earns it -- in particular whether this was the optimistic
+    # random split or the leave-cluster-out one.
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     common = {
         "dataset": args.dataset,
