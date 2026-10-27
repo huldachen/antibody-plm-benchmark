@@ -200,21 +200,34 @@ the code, not committed.
 
 ## Repository layout
 
-```
-run_benchmark.py   score every model over a dataset -> results/*_all_scored.csv
-reevaluate.py      recompute the metric suite from those scores (no model re-run)
+49 Python files, 43 committed result tables, 5 figures. Every script and
+module is documented in `docs/CODEMAP.md`, with its inputs, outputs and role.
 
-models/            zero-shot scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy
-evaluation/        metric libraries (improver retrieval, low-N protocol, DeLong)
-experiments/       drivers — e1* zero-shot · e2* supervised + leakage · e4* structure
-structures/        AntiFold fixed-backbone scoring on the 1N8Z crystal
-training/          LoRA fine-tuning + the leak-check / baseline comparison
-scripts/           merge_fitness.py — restore stripped measured values
-data/              download scripts; data/raw/README.md has access instructions
-results/           computed scores + derived metrics, grouped by dataset
-figures/           F1–F5 and their generators
-docs/              CODEMAP.md (every script) · validation_checklist.md (every claim)
 ```
+run_benchmark.py          score every model over a dataset -> results/<ds>/<ds>_all_scored.csv
+reevaluate.py             recompute the metric suite from those scores (no model re-run)
+environment.yml           analysis env (numpy/scipy/sklearn/torch/transformers)
+environment_antifold.yml  structure env — isolated, its pins conflict with the above
+LICENSE                   MIT (code and computed outputs only)
+
+models/         5  zero-shot scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy
+evaluation/     7  metric libraries — improver retrieval, low-N protocol, DeLong,
+                   partial Spearman, IMGT stratification, results-path resolver
+experiments/   21  drivers — e1* zero-shot · e2* few-shot + leakage · e4* structure,
+                   plus kydab_eval (out-of-distribution) and extract_embeddings
+structures/     3  AntiFold fixed-backbone scoring on the 1N8Z crystal
+training/      10  LoRA fine-tuning, the leak-check / baseline comparison, a contract
+                   test, and checkpoints/ (run config + logs only, never weights)
+scripts/        1  merge_fitness.py — restore stripped measured values
+data/           4  download + process Mason / Absci / KyDab (raw data not shipped)
+results/       44  computed scores + derived metrics, grouped by dataset
+figures/        8  F1–F5, their two generators, and a caption index
+docs/           2  CODEMAP.md (every script) · validation_checklist.md (every claim)
+```
+
+The `e1/e2/e4` prefixes are experiment IDs: they tie each script to the result
+table it writes (`absci_e2g_dist_stratified.csv`) and to the figure it feeds, so a
+number can be traced back to the code that produced it in one step.
 
 ## Status
 
