@@ -28,9 +28,10 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import numpy as np
 import pandas as pd
-from evaluation.paths import result_path  # noqa: E402
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 SCORED_CSV = result_path("absci_all_scored.csv")
 PDB_DIR = os.path.join(PROJECT_ROOT, "structures", "pdb")
 OUT_CSV = result_path("absci_antifold_crystal.csv")

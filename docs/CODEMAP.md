@@ -84,7 +84,7 @@ considered and why one was taken. The ones referenced from published code are:
 
 | Script | Role | Output |
 |---|---|---|
-| `evaluation/kydab_eval.py` ▶ | KyDab per-antigen / pooled / null eval — out-of-distribution generalization check with bootstrap CI, BH-FDR, and Fisher-z pooling. `--out-suffix _strictpH72` writes the strict-pH sensitivity variants. | `kydab_eval_{pooled,per_antigen,null}[_strictpH72].csv`, `kydab_scores.csv` |
+| `experiments/kydab_eval.py` ▶ | KyDab per-antigen / pooled / null eval — out-of-distribution generalization check with bootstrap CI, BH-FDR, and Fisher-z pooling. `--out-suffix _strictpH72` writes the strict-pH sensitivity variants. | `kydab_eval_{pooled,per_antigen,null}[_strictpH72].csv`, `kydab_scores.csv` |
 | `reevaluate.py` ✓ | Recompute the v2 metric suite on the committed scored CSVs (no model re-run). | `absci_v2_metrics.csv`, `mason_v2_metrics.csv`, `absci_improver_ranks.csv` |
 | `experiments/extract_embeddings.py` ⟲ | Cache mean-pooled PLM embeddings (ESM-2 1280-d, AbLang 768-d) consumed by `e2d_embeddings.py`. Requires GPU. | `*.npy` (gitignored) |
 

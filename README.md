@@ -31,22 +31,21 @@ prior, and affinity maturation is not a germline-proximity problem.
 | **Data** | 1,266 trastuzumab CDR variants with SPR Kd (Absci); 36,391 CDR-H3 variants with FACS labels (Mason 2021); KyDab multi-target panel |
 | **Methods compared** | mutation count, BLOSUM62, ESM-2 (650M), AbLang, AntiBERTy, AntiFold (inverse folding), ridge regression, LoRA fine-tuning |
 | **Statistics** | stratified bootstrap CIs, paired DeLong tests, partial correlation, tie-corrected Mann–Whitney, Bonferroni |
-| **Headline** | No method robustly beats counting mutations at retrieving improvers |
 | **Reusable output** | A 6-point evaluation protocol for vetting any affinity-ranking method |
 
 ## Why this matters
 
 Affinity maturation is resource-bound. From a large combinatorial library a team
 can only synthesise and assay a small number of variants per round, so the
-decision that consumes the budget is not *"predict every Kd"* but *"put the rare
+decision that spends the budget is not *"predict every Kd"* but *"put the rare
 improvers at the top of a short list."* A model can look strong on global
 correlation and still be useless at that decision.
 
 Two properties of combinatorial antibody data make standard benchmarks
 optimistic. Fitness correlates with edit distance from the parent, so any score
-that tracks mutation count inherits signal it did not earn. And random splits
-place near-duplicates of training variants into the test set, so a model can
-memorise rather than generalise. This benchmark is built to separate both.
+tracking mutation count inherits signal it did not earn; and random splits place
+near-duplicates of training variants into the test set, so a model can memorise
+rather than generalise. This benchmark separates both.
 
 ## Findings
 
@@ -112,45 +111,37 @@ training sequence (leave-cluster-out at Hamming ≤ 2); n = 3639, 595 positives:
 | **MLP(128) on one-hot** | **0.870** | −0.050 | **MLP better, p = 1.2×10⁻⁷** |
 
 **The conclusion is robust to the evaluation regime, which is the point.** Under
-both splits a fine-tuned 650M-parameter PLM is statistically indistinguishable
-from a logistic regression on 200 one-hot features, and significantly worse than
-a 128-unit MLP on those same features. It does beat the mutation-count baseline,
-so supervision buys something — just not more than one-hot encoding does.
-
-Removing leakage costs every method, and costs the PLM **most** (−0.062 vs −0.050
-for the MLP): the pretrained representation did not generalise to novel sequences
-better than 200 binary features did. The gap to the MLP widens from −0.024 to
-−0.036.
+both splits the fine-tuned 650M-parameter PLM ties a logistic regression on 200
+one-hot features and loses to a 128-unit MLP on those same features. It does beat
+the mutation-count baseline, so supervision buys something — just not more than
+one-hot encoding does. Removing leakage costs every method and costs the PLM
+**most** (−0.062 vs −0.050), widening the MLP gap from −0.024 to −0.036.
 
 *Caveat, stated rather than buried:* the distance-aware split shifts class balance
-(train 34.6% positive, test 16.4%) because binders are low-mutation and cluster
-into the giant component assigned to training. AUROC is prevalence-robust so the
-comparisons within each split hold, but absolute values are **not** comparable
-across the two tables — which is why they are shown separately. Test metrics use
+(train 34.6% positive, test 16.4%), because binders are low-mutation and cluster
+into the giant component assigned to training. AUROC is prevalence-robust, so
+comparisons within each split hold — but absolute values are **not** comparable
+across the two tables, which is why they are shown separately. Test metrics use
 last-epoch weights. Artifacts: `results/mason/mason_finetune_baselines{,_distance}.csv`
-and `..._delong{,_distance}.csv` via `training/leak_check.py`.
+and `..._delong{,_distance}.csv`, via `training/leak_check.py`.
 
 ## The evaluation protocol
 
 The reusable contribution: a pre-campaign checklist for vetting any
 affinity-ranking method, internal or vendor.
 
-1. Report a **mutation-count baseline** (and BLOSUM62)
-2. Use **distance-/cluster-aware splits**; quantify near-duplicate leakage
+1. Report a **mutation-count baseline** (and BLOSUM62) — most methods here do not beat it
+2. Use **distance-/cluster-aware splits**; quantify near-duplicate leakage. Random-split
+   validation on a combinatorial library returns an optimistic upper bound
 3. Report **budget-matched precision@K**, not only global correlation
 4. **Separate the tiers** — binder vs beat-parent (improver) retrieval
 5. **Control for mutation count** via partial correlation
 6. **Correct for multiple comparisons**; label borderline effects nominal
 
-## Practical implications
-
-- **Check the trivial baseline first.** Before trusting any zero-shot model to
-  rank affinity-maturation variants, verify it beats "fewer mutations from the
-  parent." Most here do not.
-- **Route models by objective.** Antibody PLMs help for humanness,
-  developability, and immunogenicity. They hurt for affinity improver-ranking.
-- **Don't trust random-split validation** on combinatorial libraries; it returns
-  optimistic upper bounds.
+One routing implication beyond the checklist: antibody PLMs earn their place on
+humanness, developability and immunogenicity. This benchmark is evidence against
+using them to rank affinity improvers — a different objective, and the germline
+prior points the wrong way for it.
 
 ## What I corrected
 
@@ -173,66 +164,65 @@ log is in `docs/validation_checklist.md`.
   difference between two correlated AUCs; added a paired DeLong test
   (`evaluation/delong.py`).
 
-## Reproducibility
+## Reproducing this
 
-Every number comes from a committed script, and metrics recompute from the
-scored CSVs without re-running any model. Comments cite `DEC-NNN` design
-decisions; `docs/CODEMAP.md` lists the ones referenced from published code. `docs/validation_checklist.md` names the
-artifact behind each claim; `docs/CODEMAP.md` documents every script, its output, and
-its role. Structure tools live in a separate conda env
-(`environment_antifold.yml`) because their pinned dependencies conflict with the
-analysis stack.
-
-## Data — not redistributed
-
-Source datasets (Absci HER2 SPR Kd, Mason 2021 FACS, KyDab) are **not** included.
-Tables in `results/` carry computed columns only (sequences, mutation counts,
-model scores); measured values are stripped. Download from the original sources
-(`data/raw/README.md`) and restore:
-
-```bash
-python scripts/merge_fitness.py absci --raw /path/to/absci_her2_spr.csv
-python scripts/merge_fitness.py kydab --raw /path/to/kydab.csv
-python scripts/merge_fitness.py mason --raw /path/to/mason_cdrh3.csv
-```
-
-Model weights, PLM embeddings, and the 1N8Z crystal are downloaded by the code,
-not committed.
-
-## Quickstart
+Every number comes from a committed script, and metrics recompute from the scored
+CSVs without re-running any model. `docs/CODEMAP.md` documents every script, its
+output and its role, and glosses the `DEC-NNN` decision markers used in comments;
+`docs/validation_checklist.md` names the artifact behind each claim.
 
 ```bash
 conda env create -f environment.yml
-conda env create -f environment_antifold.yml   # optional: AntiFold (isolated deps)
+conda env create -f environment_antifold.yml   # optional: AntiFold (isolated pins)
 
-python scripts/merge_fitness.py absci --raw <your absci table>
+python scripts/merge_fitness.py absci --raw <your absci table>   # restore measured values
 
 python experiments/e1_antirank.py             # zero-shot enrichment
 python experiments/e1c_mechanism.py           # the label-definition result (F5)
 python experiments/e2f_distance_split.py      # leakage-free supervised
 python experiments/e4b_fullcdr_eval.py        # structure partial-ρ
+python training/leak_check.py --dataset mason --split distance --d-link 2
 python figures/make_figures.py                # F1–F4
 ```
+
+`run_benchmark.py` regenerates the model scores everything else reads. You should
+not need it: those scores are committed, and it requires torch plus every model's
+weights.
+
+### Data — not redistributed
+
+Source datasets (Absci HER2 SPR Kd, Mason 2021 FACS, KyDab) are **not** included.
+Tables in `results/` carry computed columns only (sequences, mutation counts,
+model scores); measured values are stripped. Download from the original sources
+(`data/raw/README.md`) and restore with `scripts/merge_fitness.py <absci|mason|kydab>
+--raw <path>`. Model weights, PLM embeddings and the 1N8Z crystal are fetched by
+the code, not committed.
 
 ## Repository layout
 
 ```
-models/         scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy (masked-marginal)
-evaluation/     metrics — improver_metrics.py, lowN_protocol.py, delong.py, metrics.py
-experiments/    e1* zero-shot · e2* supervised + leakage · e4* structure
-structures/     AntiFold fixed-backbone scoring on 1N8Z
-training/       LoRA fine-tuning + the leak-check / baseline comparison
-data/           download scripts + data/raw/README.md (access instructions)
-scripts/        merge_fitness.py (restore source measured values)
-results/        computed scores + derived-metric CSVs (no source measured values)
-figures/        F1–F5 + generation scripts
+run_benchmark.py   score every model over a dataset -> results/*_all_scored.csv
+reevaluate.py      recompute the metric suite from those scores (no model re-run)
+
+models/            zero-shot scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy
+evaluation/        metric libraries (improver retrieval, low-N protocol, DeLong)
+experiments/       drivers — e1* zero-shot · e2* supervised + leakage · e4* structure
+structures/        AntiFold fixed-backbone scoring on the 1N8Z crystal
+training/          LoRA fine-tuning + the leak-check / baseline comparison
+scripts/           merge_fitness.py — restore stripped measured values
+data/              download scripts; data/raw/README.md has access instructions
+results/           computed scores + derived metrics, grouped by dataset
+figures/           F1–F5 and their generators
+docs/              CODEMAP.md (every script) · validation_checklist.md (every claim)
 ```
 
 ## Status
 
-Q1–Q4 are complete and reproducible from committed scores. **In progress:**
-manuscript draft (workshop methods contribution). **Planned:** benchmark
-expansion to further combinatorial antibody datasets.
+All four research arms — zero-shot, few-shot supervised, structure, fine-tuning —
+are complete and reproducible from the committed scores. **In progress:**
+manuscript draft (workshop methods contribution). **Planned:** expansion to
+further combinatorial antibody datasets, and a fine-tuning arm on Absci (the
+current fine-tuning evidence is Mason-only).
 
 ## Limitations
 

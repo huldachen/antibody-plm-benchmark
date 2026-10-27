@@ -11,9 +11,9 @@ totally distinct from trastuzumab/HER2, with paired VH/VL natural
 antibodies and quantitative SPR Kd.
 
 Usage:
-    python evaluation/kydab_eval.py --scorers random,cdrh3_length,vh_length
-    python evaluation/kydab_eval.py --scorers esm2_pll
-    python evaluation/kydab_eval.py --scorers all
+    python experiments/kydab_eval.py --scorers random,cdrh3_length,vh_length
+    python experiments/kydab_eval.py --scorers esm2_pll
+    python experiments/kydab_eval.py --scorers all
 
 Outputs:
     results/kydab_scores.csv          one row per antibody, one column per scorer
@@ -32,9 +32,10 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 from scipy import stats
-from evaluation.paths import result_path  # noqa: E402
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+sys.path.insert(0, PROJECT_ROOT)
+from evaluation.paths import result_path  # noqa: E402
 KYDAB_CSV = os.path.join(PROJECT_ROOT, "data", "processed", "kydab_paired_with_affinity.csv")
 SCORES_CACHE = result_path("kydab_scores.csv")
 
