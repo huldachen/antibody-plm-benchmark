@@ -146,18 +146,25 @@ def main() -> None:
         print(f"  N={N}: Ridge={r['mean']:.2f}±{r['ci']:.2f}  "
               f"Mut={m['mean']:.2f}±{m['ci']:.2f}  gap={gap:+.2f}±{gap_ci:.2f} [{verdict}]")
 
-    # (C) inflation factor from E2g full-CDR rho (d=1 vs d>=5).
-    rc = pd.read_csv(result_path("absci_fullcdr_recheck.csv"))
-    print("\n(C) Correlation-inflation factor (rho d=1 / rho d>=5):")
-    infl_full, infl_h3 = 0.68 / 0.48, 0.81 / 0.46
-    for k, v in [("rho_d1_fullCDR", 0.68), ("rho_dge5_fullCDR", 0.48),
-                 ("inflation_fullCDR", infl_full),
-                 ("rho_d1_HCDR3", 0.81), ("rho_dge5_HCDR3", 0.46),
-                 ("inflation_HCDR3", infl_h3)]:
-        records.append({"section": "inflation", "metric": k,
-                        "model": "", "tier": "", "N": "", "value": v})
-    print("  full-CDR: 0.68 / 0.48 = %.2fx ; HCDR3-only: 0.81 / 0.46 = %.2fx"
-          % (infl_full, infl_h3))
+    # (C) inflation factor: Ridge rho at d=1 vs d>=5, READ FROM the E2g artifacts.
+    # These four numbers were typed in as literals until 2026-11-16 and persisted
+    # to this CSV, which made unsourced constants look like computed results. One
+    # of them (full-CDR d>=5) was wrong by 0.015 and nothing could have caught it.
+    print("\n(C) Correlation-inflation factor (Ridge rho d=1 / d>=5):")
+    for basis, fname in (("fullCDR", "absci_e2g_dist_stratified_fullcdr.csv"),
+                         ("HCDR3", "absci_e2g_dist_stratified.csv")):
+        g = pd.read_csv(result_path(fname))
+        g = g[(g["metric"] == "spearman_rho") & (g["method"] == "Ridge(compact)")]
+        d1 = g[g["dist_bin"] == "1"].iloc[0]
+        d5 = g[g["dist_bin"] == ">=5"].iloc[0]
+        infl = d1["mean"] / d5["mean"]
+        for k, v in ((f"rho_d1_{basis}", d1["mean"]), (f"rho_d1_ci_{basis}", d1["ci"]),
+                     (f"rho_dge5_{basis}", d5["mean"]), (f"rho_dge5_ci_{basis}", d5["ci"]),
+                     (f"inflation_{basis}", infl)):
+            records.append({"section": "inflation", "metric": k,
+                            "model": "Ridge(compact)", "tier": "", "N": "", "value": v})
+        print(f"  {basis:<8} {d1['mean']:.3f}+/-{d1['ci']:.3f} / "
+              f"{d5['mean']:.3f}+/-{d5['ci']:.3f} = {infl:.2f}x")
 
     pd.DataFrame(records, columns=["section", "metric", "model", "tier", "N", "value"]
                  ).to_csv(OUT_CSV, index=False)

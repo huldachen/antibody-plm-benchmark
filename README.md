@@ -61,22 +61,38 @@ binders there happen to be low-mutation.
 
 ### 2. Fixed-backbone structure reduces to counting
 
-AntiFold scored on the trastuzumab–HER2 crystal out-enriches BLOSUM, yet its
-correlation with affinity vanishes once mutation count is controlled
-(raw ρ = +0.135 → partial ρ = +0.003, n.s.; ρ = −0.71 with mutation count). We
-raise as a testable question whether reported inverse-folding advantages are
+AntiFold, scored on the trastuzumab–HER2 crystal (PDB 1N8Z) against **Absci HER2
+SPR affinity** (n = 420 binders), out-enriches BLOSUM — yet its correlation with
+affinity vanishes once mutation count is controlled. On the full-CDR basis
+(29 varying positions, the corrected one): raw ρ = +0.135, ρ = −0.708 against
+full-CDR mutation count, **partial ρ = −0.074 (p = 0.13, n.s.)**. Controlling for
+CDR-H3 count instead gives partial ρ = +0.003 — same verdict, different basis.
+We raise as a testable question whether reported inverse-folding advantages are
 partly a mutation-count artifact.
+
+*All three numbers above share one control variable, so they reconcile under the
+partial-correlation identity. Quoting a raw ρ from one basis beside a
+control-correlation from another does not, and this README did exactly that until
+2026-11-16.*
 
 <p align="center"><img src="figures/F3_structure_counting.png" width="760" alt="AntiFold's correlation disappears under partial correlation control"></p>
 
 ### 3. A correlation edge is not a discovery edge
 
 Combinatorial libraries leak: a random split puts near-duplicates in the test
-set. With distance-aware splits, ridge regression keeps a *correlation*
-advantage (ρ 0.68 → 0.48 vs a flat counter) but matches counting on the metric
-that reflects the actual decision — a stringent, budget-matched precision@K. On
-near-improver AUROC (n = 42, 20 seeds) the edge nearly closes: Ridge 0.72 ± 0.03
-vs MutCount 0.65 ± 0.03 at d ≥ 5, a +0.06 gap, down from +0.36 at d = 1.
+set. Binning test binders by distance to the nearest training variant separates
+the two things a model can be good at. Ridge keeps a **correlation** that decays
+but survives — ρ 0.68 ± 0.07 at d = 1 falling to 0.46 ± 0.03 at d ≥ 5, a 1.5×
+inflation from leakage alone — while its **discovery** edge over a plain mutation
+counter shrinks threefold: near-improver AUROC 0.73 ± 0.03 vs 0.63 ± 0.03 at
+d ≥ 5 (gap +0.10), down from +0.29 at d = 1. Labels generalise for ranking the
+bulk, far less for finding the rare top.
+
+*Both bases agree on the shape; the numbers above are all full-CDR (20 seeds,
+`results/absci/absci_e2g_dist_stratified_fullcdr.csv`). On the CDR-H3 basis the
+decay is steeper (ρ 0.81 → 0.46) and the discovery gap closes further (+0.37 →
++0.06). The ρ pair here is a leakage before/after, **not** a comparison against
+the counter — an earlier phrasing implied otherwise.*
 
 <p align="center">
   <img src="figures/F1_leakage.png" width="440" alt="Near-duplicate leakage between train and test">
@@ -220,7 +236,7 @@ training/      10  LoRA fine-tuning, the leak-check / baseline comparison, a con
                    test, and checkpoints/ (run config + logs only, never weights)
 scripts/        1  merge_fitness.py — restore stripped measured values
 data/           4  download + process Mason / Absci / KyDab (raw data not shipped)
-results/       44  computed scores + derived metrics, grouped by dataset
+results/       45  computed scores + derived metrics, grouped by dataset
 figures/        8  F1–F5, their two generators, and a caption index
 docs/           2  CODEMAP.md (every script) · validation_checklist.md (every claim)
 ```

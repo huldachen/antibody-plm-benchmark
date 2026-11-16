@@ -22,6 +22,7 @@ Run (plm env): python experiments/e2g_distance_stratified.py
 Outputs: results/absci_e2g_dist_stratified.csv, figures/figE2g_distance_stratified.png
 """
 
+import argparse
 import os
 import sys
 
@@ -38,24 +39,46 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
 
-from experiments.absci_fewshot_common import load_absci, ridge_scorer  # noqa: E402
-
-OUT_CSV = result_path("absci_e2g_dist_stratified.csv")
-OUT_PNG = os.path.join(PROJECT_ROOT, "figures", "figE2g_distance_stratified.png")
+from experiments.absci_fewshot_common import load_absci, one_hot, ridge_scorer  # noqa: E402
 
 N_TRAIN = 200
 N_SEEDS = 20
-L = 13
 DIST_BINS = [1, 2, 3, 4, 5]        # last is ">=5"
+CDRS = ["HCDR1", "HCDR2", "HCDR3"]
 MIN_BIN_N = 15                      # binders needed to score a bin
 MIN_POS = 2                         # near-improvers needed for AUROC in a bin
 
 
 def main() -> None:
+    """Run the distance-stratified comparison on the chosen sequence basis."""
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+    ap.add_argument("--basis", choices=["hcdr3", "fullcdr"], default="hcdr3",
+                    help="sequence basis for BOTH the distance metric and the "
+                         "Ridge features (default: hcdr3, the published arm)")
+    args = ap.parse_args()
+
     data = load_absci()
-    X1, Xc = data["X_1hot"], data["X_compact"]
     fit, binder, mut, y, near = (data["fit"], data["binder"], data["mutcount"],
                                  data["y"], data["near"])
+
+    if args.basis == "fullcdr":
+        # All 29 varying positions, not just HCDR3's 13. Absci variants also vary
+        # in HCDR1/HCDR2, so an HCDR3-only distance understates how close a test
+        # variant really is to the training set.
+        df = data["df"]
+        X1 = np.hstack([one_hot(df[c].values) for c in CDRS])
+        Xc = np.hstack([X1, mut.reshape(-1, 1)])
+        suffix = "_fullcdr"
+    else:
+        X1, Xc = data["X_1hot"], data["X_compact"]
+        suffix = ""
+
+    L = X1.shape[1] // 20
+    out_csv = result_path(f"absci_e2g_dist_stratified{suffix}.csv")
+    out_png = os.path.join(PROJECT_ROOT, "figures",
+                           f"figE2g_distance_stratified{suffix}.png")
+    print(f"basis={args.basis} ({L} positions)")
+
     n = len(fit)
     D = (L - (X1 @ X1.T)).astype(int)
     ridge = ridge_scorer(Xc, y)
@@ -103,7 +126,7 @@ def main() -> None:
 
     A, B = agg(rho_df, "rho"), agg(auc_df, "auroc")
     A["metric"], B["metric"] = "spearman_rho", "improver_auroc"
-    pd.concat([A, B], ignore_index=True).to_csv(OUT_CSV, index=False)
+    pd.concat([A, B], ignore_index=True).to_csv(out_csv, index=False)
 
     order = [str(b) for b in DIST_BINS[:-1]] + [f">={DIST_BINS[-1]}"]
     order = [b for b in order if b in A["dist_bin"].values]
@@ -124,12 +147,12 @@ def main() -> None:
               f"{cell(A,'rho',b,'Ridge(compact)')} {cell(A,'rho',b,'MutCount')} | "
               f"{cell(B,'auroc',b,'Ridge(compact)')} {cell(B,'auroc',b,'MutCount')}")
 
-    _plot(A, B, order)
-    print(f"\nSaved -> {os.path.relpath(OUT_CSV, PROJECT_ROOT)}, "
-          f"{os.path.relpath(OUT_PNG, PROJECT_ROOT)}")
+    _plot(A, B, order, out_png)
+    print(f"\nSaved -> {os.path.relpath(out_csv, PROJECT_ROOT)}, "
+          f"{os.path.relpath(out_png, PROJECT_ROOT)}")
 
 
-def _plot(A, B, order) -> None:
+def _plot(A, B, order, out_png) -> None:
     style = {"Ridge(compact)": dict(color="#1F6FB2", marker="o", lw=2.4),
              "MutCount": dict(color="#E8820C", marker="o", lw=2.4, ls="--")}
     x = np.arange(len(order))
@@ -165,7 +188,7 @@ def _plot(A, B, order) -> None:
                  "not the same as the one that DISCOVERS (stringent top-K)",
                  fontsize=11.5, weight="bold", y=1.02)
     fig.tight_layout()
-    fig.savefig(OUT_PNG, dpi=300, bbox_inches="tight")
+    fig.savefig(out_png, dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":

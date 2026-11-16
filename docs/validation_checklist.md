@@ -91,8 +91,11 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
   counting?*
 - **Outcome:** raw ρ = +0.097 → **partial ρ = −0.054 (n.s.)** on the CDR-H3 basis
   (`absci_e4_partial_corr.csv`); re-scored on the corrected full-CDR basis reported
-  in the README/figures, raw ρ = +0.135 → **partial ρ = +0.003 / −0.074 (n.s.)** —
-  same conclusion. AntiFold vs mutation count **ρ = −0.73** (−0.71 full-CDR). No —
+  in the README/figures, raw ρ = +0.135, ρ = −0.708 against full-CDR mutation
+  count, **partial ρ = −0.074 (p = 0.13, n.s.)**. On the CDR-H3 basis the matching
+  triple is +0.135, −0.725, **+0.003 (p = 0.95, n.s.)** — same conclusion. Quote a
+  partial only together with the ρ(score, count) from the *same* control basis;
+  mixing the two bases in one sentence yields arithmetic no reader can reconcile. AntiFold vs mutation count **ρ = −0.73** (−0.71 full-CDR). No —
   fixed-backbone IF is mechanistically a counter. ESM-2's partial ρ is *nominally*
   anti on the CDR-H3 basis (−0.110, p = 0.023) but does **not** survive the full-CDR
   re-scoring, so we do not rest the mechanism on it and lead instead with the
