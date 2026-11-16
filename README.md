@@ -5,14 +5,17 @@
 Antibody engineering teams increasingly rank candidate molecules with protein
 language models (PLMs), structure models, or small supervised models. I tested
 those methods against deliberately trivial baselines on a real
-affinity-maturation task and found that **none of them reliably beats simply
-counting mutations.** The durable contribution here is not the negative result
+affinity-maturation task. **No zero-shot method reliably beats simply counting
+mutations** — and the supervised methods that *do* beat it gain nothing from the
+pretrained model: across three datasets a LoRA fine-tune of ESM-2-650M never
+outperforms a one-hot or 3-mer encoding of the same sequence. The durable
+contribution here is not the negative result
 but the *evaluation protocol* that reveals it — and a worked demonstration that
 the evaluation design, not the model, often decides the published conclusion.
 
 <p align="center">
   <img src="figures/F5_label_definition.png" width="900"
-       alt="Changing only the definition of a positive reverses the verdict: a mutation counter improves while PLMs fall below chance">
+       alt="Changing only the definition of a positive reverses the verdict: a mutation counter holds while every PLM degrades to or below chance">
 </p>
 
 **The sharpest single result, shown above.** Hold the dataset and the model
@@ -76,10 +79,9 @@ CDR-H3 count instead gives partial ρ = +0.003 — same verdict, different basis
 We raise as a testable question whether reported inverse-folding advantages are
 partly a mutation-count artifact.
 
-*All three numbers above share one control variable, so they reconcile under the
-partial-correlation identity. Quoting a raw ρ from one basis beside a
-control-correlation from another does not, and this README did exactly that until
-2026-11-16.*
+*All three numbers share one control variable, so they reconcile under the
+partial-correlation identity; a raw ρ from one basis quoted beside a
+control-correlation from another does not.*
 
 <p align="center"><img src="figures/F3_structure_counting.png" width="760" alt="AntiFold's correlation disappears under partial correlation control"></p>
 
@@ -97,8 +99,8 @@ bulk, far less for finding the rare top.
 *Both bases agree on the shape; the numbers above are all full-CDR (20 seeds,
 `results/absci/absci_e2g_dist_stratified_fullcdr.csv`). On the CDR-H3 basis the
 decay is steeper (ρ 0.81 → 0.46) and the discovery gap closes further (+0.37 →
-+0.06). The ρ pair here is a leakage before/after, **not** a comparison against
-the counter — an earlier phrasing implied otherwise.*
++0.06). The ρ pair is a leakage before/after, **not** a comparison against the
+counter: the counter's own ρ is +0.066 at d = 1 and +0.079 at d ≥ 5.*
 
 <p align="center">
   <img src="figures/F1_leakage.png" width="440" alt="Near-duplicate leakage between train and test">
@@ -143,7 +145,7 @@ one-hot encoding does. Removing leakage costs every method and costs the PLM
 
 | method | random | distance |
 |---|---:|---:|
-| LR on mutation count | 0.658 | 0.645 |
+| LR on mutation count | 0.658 | 0.644 |
 | LR on one-hot CDR-H3 | **0.943** | **0.939** |
 | ESM-2-650M + LoRA (r = 8) | 0.935 | 0.903 |
 | MLP(128) on one-hot | 0.931 | 0.924 |
@@ -267,14 +269,12 @@ log is in `docs/validation_checklist.md`.
   within-Hamming-≤2 overlap 39.1% → 26.3%, exact duplicates 14 → 0 — measuring
   on CDR-H3 alone overstated leakage by about 1.5×. This is a **basis**
   correction, not the distance-aware split (that is the separate e2f arm).
-- **A signal demoted — and the stated reason was itself wrong.** ESM-2's partial
-  correlation is nominally anti-fitness (ρ = −0.111, p = 0.023, and −0.124,
-  p = 0.011 controlling for full-CDR count instead). It does not survive
-  restricting to the 398 binders ESM-2 actually scores correctly — variants that
-  vary in CDR-H3 only — where it falls to **ρ = −0.057, p = 0.26**. Until
-  2026-11-16 this README and the checklist attributed the demotion to "full-CDR
-  re-scoring", which is not what killed it; the signal is *stronger* on that
-  basis. Dropped on the provenance evidence, which is the evidence that applies.
+- **A signal demoted.** ESM-2's partial correlation is nominally anti-fitness
+  (ρ = −0.111, p = 0.023; −0.124, p = 0.011 controlling for full-CDR count). It
+  does not survive restricting to the 398 binders ESM-2 scores correctly —
+  CDR-H3-only variants — where it falls to **ρ = −0.057, p = 0.26**. Dropped on
+  that provenance evidence; the signal is *stronger*, not weaker, on the
+  full-CDR basis.
 - **Tie correction.** Strict-tier enrichment p rested on a score tie; midrank
   Mann–Whitney moved it 0.028 → 0.075. Now applied to every rank statistic.
 - **Mason flipped the thesis.** I expected the anti-ranking to replicate; instead
@@ -352,19 +352,28 @@ number can be traced back to the code that produced it in one step.
 ## Status
 
 All four research arms — zero-shot, few-shot supervised, structure, fine-tuning —
-are complete and reproducible from the committed scores. **In progress:**
-manuscript draft (workshop methods contribution). **Planned:** expansion to
-further combinatorial antibody datasets, and a fine-tuning arm on Absci (the
-current fine-tuning evidence is Mason-only).
+are complete and reproducible from the committed scores, on all three datasets.
+**In progress:** manuscript draft (workshop methods contribution). **Planned:**
+expansion to further combinatorial antibody libraries with quantitative affinity.
 
 ## Limitations
 
-Single target (trastuzumab / HER2). The strict improver tier is n = 5, which is
-reported with its interval and is too small to carry a claim — the headline rests
-on the n = 42 tier. The structure arm is fixed-backbone only. Zero-shot PLM
-scores model CDR-H3 variation only; HCDR1/2 variation (20% of variants, 0% of
-improvers) is unmodelled, and conclusions were re-verified on the exactly-scored
-subset. Full log in `docs/validation_checklist.md`.
+- **One parent.** The combinatorial arms are a single target (trastuzumab / HER2).
+  KyDab adds four antigens, but it is not a mutant library — no parent, variable
+  CDR-H3 length — so findings 1–3 cannot be tested there at all.
+- **Small positive sets.** The strict improver tier is n = 5, reported with its
+  interval and too small to carry a claim; the headline rests on the n = 42 tier.
+- **Fine-tuning is one configuration**, not a hyperparameter search: LoRA r = 8,
+  lr = 1e-4, 5 epochs, last-epoch weights. A better-tuned fine-tune might close
+  the gap — it would still have to beat 200–260 binary features to matter.
+- **Absci's test split is small** (n = 124), so its comparisons cannot resolve
+  differences below roughly 0.05 AUROC. Mason carries the powered version.
+- **The structure arm is fixed-backbone only** (one crystal, PDB 1N8Z).
+- **Zero-shot PLM scores model CDR-H3 variation only.** HCDR1/2 variation (20% of
+  variants, 0% of improvers) is unmodelled; conclusions were re-verified on the
+  exactly-scored subset.
+
+Full log in `docs/validation_checklist.md`.
 
 ## License
 
