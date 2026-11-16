@@ -32,6 +32,8 @@ except ModuleNotFoundError:
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 MASON_CSV = os.path.join(PROJECT_ROOT, "data", "processed", "mason_cdrh3_enrichment.csv")
 ABSCI_CSV = os.path.join(PROJECT_ROOT, "data", "processed", "absci_her2_spr.csv")
+KYDAB_CSV = os.path.join(PROJECT_ROOT, "data", "processed",
+                         "kydab_paired_with_affinity.csv")
 
 Task = Literal["classification", "regression"]
 
@@ -55,6 +57,11 @@ def _spec(dataset: str, task: Task) -> DatasetSpec:
         return DatasetSpec("absci", task, "HCDR3", "Binder", "long", True)
     if dataset == "absci" and task == "regression":
         return DatasetSpec("absci", task, "HCDR3", "neg_log_Kd", "float32", False)
+    if dataset == "kydab" and task == "regression":
+        # KyDab has no parent sequence, so there is no binder/non-binder call to
+        # classify and no mutation count to compare against -- only affinity to
+        # rank. Regression is the only well-posed task here.
+        return DatasetSpec("kydab", task, "heavy_cdr3", "neg_log_Kd", "float32", False)
     raise ValueError(f"Unsupported (dataset, task): ({dataset}, {task})")
 
 
@@ -99,11 +106,41 @@ def _dedup_by_sequence(
     return out
 
 
-def load_dataframe(dataset: str, task: Task) -> tuple[pd.DataFrame, DatasetSpec]:
-    """Load and filter the processed CSV for a given dataset/task."""
+def load_dataframe(dataset: str, task: Task,
+                   antigen: str | None = None) -> tuple[pd.DataFrame, DatasetSpec]:
+    """Load and filter the processed CSV for a given dataset/task.
+
+    Parameters
+    ----------
+    dataset : str
+        "mason", "absci" or "kydab".
+    task : Task
+        "classification" or "regression".
+    antigen : str, optional
+        KyDab only: restrict to one `project`. KyDab pools four separate
+        immunisations against different antigens; a model trained across them
+        would have to predict affinity for a target it cannot see, since the
+        input is CDR-H3 alone. Fitting per antigen is the only honest framing.
+
+    Returns
+    -------
+    tuple
+        (dataframe, spec)
+    """
     spec = _spec(dataset, task)
     if dataset == "mason":
         df = pd.read_csv(MASON_CSV)
+    elif dataset == "kydab":
+        df = pd.read_csv(KYDAB_CSV)
+        # Same filters as experiments/kydab_eval.py, so the fine-tuned model and
+        # the published zero-shot scores describe the same rows. Two records
+        # report KD exactly 0, which makes neg_log_Kd infinite.
+        df = df.dropna(subset=["heavy_cdr3", spec.label_col, "project"])
+        df = df[np.isfinite(df[spec.label_col])]
+        if antigen is not None:
+            df = df[df["project"] == antigen]
+            if df.empty:
+                raise ValueError(f"no KyDab rows for antigen {antigen!r}")
     elif dataset == "absci":
         df = pd.read_csv(ABSCI_CSV)
         df = df[df["SameLength"] == 1].copy()

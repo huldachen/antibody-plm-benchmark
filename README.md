@@ -17,10 +17,14 @@ the evaluation design, not the model, often decides the published conclusion.
 
 **The sharpest single result, shown above.** Hold the dataset and the model
 scores completely fixed and change *only* what counts as a "good" variant. A
-parameter-free mutation counter rises from AUROC 0.63 [0.60–0.67] to 0.72
-[0.65–0.79], while AbLang falls from 0.56 [0.53–0.60] to 0.45 [0.37–0.53] — at or
-below chance (n = 420 → n = 42; paired DeLong, Δ = 0.27, **p = 4.3×10⁻⁷**).
-Nothing about the models changed. Antibody PLMs encode a germline-*naturalness*
+parameter-free mutation counter **holds** — 0.634 [0.602–0.667] on binders
+(n = 420), 0.723 [0.652–0.790] on near-improvers (n = 42). Those intervals
+overlap, so the apparent rise is *not* separable; the claim is that the counter
+does not degrade. **Every PLM does:** AbLang falls from 0.565 [0.531–0.599] to
+0.449 [0.373–0.529], at or below chance. The counter beats AbLang at *both*
+tiers — paired DeLong Δ = +0.069, p = 3.3×10⁻⁴ on binders and Δ = +0.274,
+**p = 4.3×10⁻⁷** on near-improvers — and on Mason binders it reaches 0.750
+against ESM-2's 0.523 (n = 154, p = 1.1×10⁻¹¹). Nothing about the models changed. Antibody PLMs encode a germline-*naturalness*
 prior, and affinity maturation is not a germline-proximity problem.
 
 ## At a glance
@@ -66,7 +70,7 @@ of the germline prior, not of PLMs in general.
 AntiFold, scored on the trastuzumab–HER2 crystal (PDB 1N8Z) against **Absci HER2
 SPR affinity** (n = 420 binders), out-enriches BLOSUM — yet its correlation with
 affinity vanishes once mutation count is controlled. On the full-CDR basis
-(29 varying positions, the corrected one): raw ρ = +0.135, ρ = −0.708 against
+(29 varying positions, the corrected one): raw ρ = +0.135 (p = 0.0056), ρ = −0.708 against
 full-CDR mutation count, **partial ρ = −0.074 (p = 0.13, n.s.)**. Controlling for
 CDR-H3 count instead gives partial ρ = +0.003 — same verdict, different basis.
 We raise as a testable question whether reported inverse-folding advantages are
@@ -188,6 +192,52 @@ across the two tables, which is why they are shown separately. Test metrics use
 last-epoch weights. Artifacts: `results/mason/mason_finetune_baselines{,_distance}.csv`
 and `..._delong{,_distance}.csv`, via `training/leak_check.py`.
 
+### KyDab — the generalisation check, on a panel that is not a combinatorial library
+
+KyDab is natural antibodies from four immunisations, and it **breaks three of the
+four comparisons above by construction** — which is itself worth stating:
+
+- **no parent**, so "mutation count from WT" does not exist and neither does the
+  improver tier. Findings 1–3 cannot be rerun here;
+- **CDR-H3 length varies** (8–24 residues), so the one-hot baseline that carries
+  the argument above does not apply;
+- **four different antigens**; a CDR-H3-only model cannot know which target it is
+  predicting for, so each antigen is fitted separately. Only typhi-01 (374 unique
+  sequences) and pertussis (258) are large enough to train on at all.
+
+What remains well-posed is affinity *ranking within an antigen*. Cross-fitted
+5-fold, against a ridge on 3-mer counts — a supervised comparator on the same
+folds, since k-mers handle variable length and one-hot does not:
+
+| scorer | typhi-01 (n = 365) | pertussis (n = 258) |
+|---|---:|---:|
+| **Ridge on 3-mer counts**, cross-fitted | **+0.348** | **+0.451** |
+| ESM-2-650M + LoRA, cross-fitted | +0.175 | +0.233 |
+| ESM-2 zero-shot (PLL) | +0.101 | −0.002 |
+| AbLang zero-shot (PLL) | −0.154 | −0.016 |
+| CDR-H3 length | +0.023 | −0.076 |
+
+Spearman ρ against neg_log_Kd. **Here the fine-tuned PLM does not tie the trivial
+baseline — it loses to it**, on both antigens: Δ = −0.173 [−0.281, −0.063],
+p = 0.002 on typhi-01 and Δ = −0.218 [−0.345, −0.087], p < 0.001 on pertussis
+(paired bootstrap over variants, since two Spearman ρ on the same rows are
+correlated). Fine-tuning does learn *something* — it beats CDR-H3 length on both
+and zero-shot ESM-2 on pertussis — just far less than a bag of 3-mers.
+
+Per-fold R² is mostly **negative** (−1.07 to +0.14 on typhi-01), so the model does
+not predict absolute affinity at all; only the ranking is weakly positive.
+
+*This is a different task from the arms above — affinity regression on natural
+antibodies, not improver retrieval on a mutant library — so it is evidence that
+travels with that caveat attached, not a fourth replication.*
+
+Artifacts: `results/kydab/kydab_finetune_eval.csv`, `kydab_*_finetune_oof.csv`,
+via `training/finetune_cv.py --dataset kydab --antigen <project>` +
+`experiments/e6_kydab_finetune.py`.
+
+**Across three datasets, the fine-tuned 650M model never beats a cheap encoding of
+the same sequence** — it ties one-hot on Mason and Absci and loses to 3-mers here.
+
 ## The evaluation protocol
 
 The reusable contribution: a pre-campaign checklist for vetting any
@@ -214,7 +264,9 @@ log is in `docs/validation_checklist.md`.
 - **Full-CDR basis.** The first analysis scored CDR-H3 only; Absci variants also
   vary in HCDR1/HCDR2. Re-ran on the complete 29-position basis. Conclusions held.
 - **Leakage overstated.** CDR-H3-only distance exaggerated near-duplication:
-  within-Hamming-≤2 overlap 39.1% → 26.3%, exact duplicates 14 → 0.
+  within-Hamming-≤2 overlap 39.1% → 26.3%, exact duplicates 14 → 0 — measuring
+  on CDR-H3 alone overstated leakage by about 1.5×. This is a **basis**
+  correction, not the distance-aware split (that is the separate e2f arm).
 - **A signal demoted — and the stated reason was itself wrong.** ESM-2's partial
   correlation is nominally anti-fitness (ρ = −0.111, p = 0.023, and −0.124,
   p = 0.011 controlling for full-CDR count instead). It does not survive
@@ -281,16 +333,16 @@ LICENSE                   MIT (code and computed outputs only)
 models/         5  zero-shot scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy
 evaluation/     7  metric libraries — improver retrieval, low-N protocol, DeLong,
                    partial Spearman, IMGT stratification, results-path resolver
-experiments/   22  drivers — e1* zero-shot · e2* few-shot + leakage · e4* structure,
+experiments/   23  drivers — e1* zero-shot · e2* few-shot + leakage · e4* structure,
                    plus kydab_eval (out-of-distribution) and extract_embeddings
 structures/     3  AntiFold fixed-backbone scoring on the 1N8Z crystal
 training/      15  LoRA fine-tuning, the leak-check / baseline comparison, a contract
                    test, and checkpoints/ (run config + logs only, never weights)
 scripts/        1  merge_fitness.py — restore stripped measured values
 data/           4  download + process Mason / Absci / KyDab (raw data not shipped)
-results/       52  computed scores + derived metrics, grouped by dataset
+results/       55  computed scores + derived metrics, grouped by dataset
 figures/        8  F1–F5, their two generators, and a caption index
-docs/           2  CODEMAP.md (every script) · validation_checklist.md (every claim)
+docs/           3  CODEMAP.md (every script) · validation_checklist.md (every claim)
 ```
 
 The `e1/e2/e4` prefixes are experiment IDs: they tie each script to the result

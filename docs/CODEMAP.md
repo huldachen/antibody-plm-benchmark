@@ -121,6 +121,9 @@ stratified split, an upper bound, not a distance-aware result.*
 | `evaluation/improver_metrics.py` | 13× | Improver / near-improver masks, tie-corrected enrichment (midrank MW), P@K / Recall@K, fold-improvement. |
 | `evaluation/lowN_protocol.py` | 9× | Stratified splits, fixed-test splits, learning-curve runners, summaries with CIs. |
 | `evaluation/metrics.py` | 16× | v2 metric suite (Spearman, Kendall, AUROC, AUPRC, P@K, best F1). |
+| `training/finetune_cv.py` ⟲ | K-fold cross-fitted LoRA: every variant scored by a model that never saw it. Needed because one held-out Absci split holds 2 strict and 7 near improvers. `--antigen` restricts KyDab to one project. | `<ds>_finetune_oof.csv` |
+| `experiments/e5_finetune_improver.py` ▶ | Improver retrieval on the cross-fitted scores, against a one-hot logistic regression fitted on the SAME folds. | `absci_finetune_improver.csv` |
+| `experiments/e6_kydab_finetune.py` ▶ | KyDab per-antigen affinity ranking: cross-fitted LoRA vs a 3-mer ridge on the same folds, paired-bootstrap difference. | `kydab_finetune_eval.csv` |
 | `evaluation/paths.py` | 29× | Resolves a result filename to its grouped location (`results/<dataset>/<name>.csv`), falling back to the legacy flat path if the grouped one is absent. Single source of truth for the results layout, so regrouping does not touch 29 call sites. |
 | `evaluation/metrics.py` → `partial_spearman` | 3× | Spearman of x and y controlling for z, as Pearson on rank-residuals — the statistic behind every "does the signal survive controlling for mutation count?" claim. Was three copies in three scripts until 2026-10-27. |
 | `evaluation/delong.py` | 2× | Paired DeLong test for two **correlated** ROC AUCs (fast midrank algorithm). Per-model bootstrap CIs do not test a difference between two models scored on the same split; this does. Returns delta, its standard error, z and p. |

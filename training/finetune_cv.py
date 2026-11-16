@@ -45,7 +45,9 @@ from training.train_lora import (  # noqa: E402
 def parse_args() -> argparse.Namespace:
     """Command-line arguments for cross-fitted fine-tuning."""
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    p.add_argument("--dataset", choices=["mason", "absci"], required=True)
+    p.add_argument("--dataset", choices=["mason", "absci", "kydab"], required=True)
+    p.add_argument("--antigen", default=None,
+                   help="KyDab only: restrict to one project/antigen")
     p.add_argument("--task", choices=["classification", "regression"],
                    default="classification")
     p.add_argument("--folds", type=int, default=5)
@@ -69,10 +71,13 @@ def main() -> int:
     device = pick_device(args.device)
     is_cls = args.task == "classification"
 
-    df, spec = load_dataframe(args.dataset, args.task)
-    print(f"[data] {args.dataset}/{args.task}: n={len(df)}")
+    df, spec = load_dataframe(args.dataset, args.task, antigen=args.antigen)
+    tag = f"{args.dataset}" + (f"_{args.antigen}" if args.antigen else "")
+    print(f"[data] {tag}/{args.task}: n={len(df)}")
     y = df[spec.label_col].to_numpy()
-    strata = y if is_cls else pd.qcut(y, 4, labels=False, duplicates="drop").to_numpy()
+    # qcut on an ndarray returns an ndarray, not a Series -- no .to_numpy().
+    strata = y if is_cls else np.asarray(
+        pd.qcut(y, 4, labels=False, duplicates="drop"))
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     collator = DataCollatorWithPadding(tokenizer=tokenizer)
@@ -122,7 +127,7 @@ def main() -> int:
     assert not np.isnan(oof).any(), "some variant never landed in a held-out fold"
     out = pd.DataFrame({spec.seq_col: df[spec.seq_col].values,
                         "oof_score": oof, "fold": fold_of})
-    path = result_path(f"{args.dataset}_finetune_oof.csv")
+    path = result_path(f"{tag.replace('-', '')}_finetune_oof.csv")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     out.to_csv(path, index=False)
     print(f"\nSaved {len(out)} out-of-fold scores -> "
