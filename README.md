@@ -274,7 +274,8 @@ log is in `docs/validation_checklist.md`.
   does not survive restricting to the 398 binders ESM-2 scores correctly —
   CDR-H3-only variants — where it falls to **ρ = −0.057, p = 0.26**. Dropped on
   that provenance evidence; the signal is *stronger*, not weaker, on the
-  full-CDR basis.
+  full-CDR basis — which is why the earlier "full-CDR re-scoring" explanation was
+  itself wrong.
 - **Tie correction.** Strict-tier enrichment p rested on a score tie; midrank
   Mann–Whitney moved it 0.028 → 0.075. Now applied to every rank statistic.
 - **Mason flipped the thesis.** I expected the anti-ranking to replicate; instead
