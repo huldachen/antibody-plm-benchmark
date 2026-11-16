@@ -15,7 +15,7 @@ analysis-record plots, not publication figures, and are not committed.
 
 | file | what it shows |
 |---|---|
-| `F1_leakage.png` | Sequence-overlap leakage, measured on the full CDR basis (CDR-H3-only distance overstates near-duplication: 39%→27% within Hamming ≤2, 14→0 exact duplicates). |
+| `F1_leakage.png` | Sequence-overlap leakage, measured on the full CDR basis (CDR-H3-only distance overstates near-duplication: 39.1%→26.3% within Hamming ≤2, 14→0 exact duplicates). |
 | `F2_zeroshot_two_prior.png` | Two edit-distance-like priors: parent-distance baselines (mutation count, BLOSUM62) enrich improvers; the PLMs do not (signed MW enrichment + near-improver AUROC). |
 | `F3_structure_counting.png` | Fixed-backbone inverse folding reduces to counting. One panel per **control basis** — full-CDR count (corrected, 29 positions) and CDR-H3 count (original, 13) — because a partial ρ is meaningless without the control it used. AntiFold's raw ρ = +0.135 goes to −0.074 (n.s.) and +0.003 (n.s.) respectively. Every partial carries its p-value; MutCount-controlled-for-its-own-count is labelled undefined rather than plotted. Footnote records that ESM-2's significant partial is demoted on provenance, not basis. |
 | `F4_correlation_vs_discovery.png` | The advantage that generalizes (global ρ) is not the one that discovers (near-improver AUROC ≈ counting); Panel B is the decision-relevant metric. |

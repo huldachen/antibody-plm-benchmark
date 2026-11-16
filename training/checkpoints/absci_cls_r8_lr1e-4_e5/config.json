@@ -1,0 +1,36 @@
+{
+  "args": {
+    "dataset": "absci",
+    "task": "classification",
+    "model_name": "facebook/esm2_t33_650M_UR50D",
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_dropout": 0.05,
+    "lr": 0.0001,
+    "epochs": 5,
+    "batch_size": 8,
+    "max_length": 32,
+    "seed": 42,
+    "split": "random",
+    "d_link": 2,
+    "output_dir": "training/checkpoints/absci_cls_r8_lr1e-4_e5",
+    "device": "auto",
+    "smoke_test": false
+  },
+  "best_epoch": 4,
+  "best_val_metric": 0.9329268292682927,
+  "best_metric_key": "roc_auc",
+  "trainable_params": 7724802,
+  "total_params": 658768025,
+  "test_metrics": {
+    "accuracy": 0.8790322580645161,
+    "mcc": 0.7262752100297801,
+    "roc_auc": 0.934959349593496,
+    "loss": 0.41947696556998115
+  },
+  "label_summary": {
+    "train": "n=990 class_counts={0: 659, 1: 331}",
+    "val": "n=124 class_counts={0: 82, 1: 42}",
+    "test": "n=124 class_counts={0: 82, 1: 42}"
+  }
+}

@@ -17,6 +17,8 @@ Output: results/absci_e2e_leakage.csv, stdout histogram.
 import os
 import sys
 
+import argparse
+
 import numpy as np
 import pandas as pd
 
@@ -24,19 +26,34 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
 
-from experiments.absci_fewshot_common import load_absci  # noqa: E402
+from experiments.absci_fewshot_common import load_absci, one_hot  # noqa: E402
 from evaluation.lowN_protocol import fixed_eval_split  # noqa: E402
 
-OUT_CSV = result_path("absci_e2e_leakage.csv")
 EVAL_FRAC = 0.40
 SPLIT_SEED = 0
-L = 13
+CDRS = ["HCDR1", "HCDR2", "HCDR3"]
 
 
 def main() -> None:
+    """Quantify near-duplicate leakage on the chosen sequence basis."""
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+    ap.add_argument("--basis", choices=["hcdr3", "fullcdr"], default="hcdr3",
+                    help="distance basis. CDR-H3 only (13 positions, the "
+                         "original) overstates near-duplication, because Absci "
+                         "variants also vary in HCDR1/HCDR2")
+    args = ap.parse_args()
+
     data = load_absci()
-    X = data["X_1hot"]                     # (n, 13*20) one-hot
     binder, strict = data["binder"], data["strict"]
+    if args.basis == "fullcdr":
+        X = np.hstack([one_hot(data["df"][c].values) for c in CDRS])
+        suffix = "_fullcdr"
+    else:
+        X = data["X_1hot"]
+        suffix = ""
+    L = X.shape[1] // 20
+    OUT_CSV = result_path(f"absci_e2e_leakage{suffix}.csv")
+    print(f"basis={args.basis} ({L} positions)")
 
     # Hamming distance matrix from the one-hot Gram (matches = X@X.T per position).
     matches = X @ X.T
@@ -51,7 +68,7 @@ def main() -> None:
     global_nn = D.min(axis=1)
 
     def hist(arr, label):
-        print(f"\n{label} (n={len(arr)}): min CDR-H3 Hamming distance")
+        print(f"\n{label} (n={len(arr)}): min Hamming distance")
         vals, counts = np.unique(arr, return_counts=True)
         for v, c in zip(vals, counts):
             print(f"  d={v:>2}: {c:4d}  ({100*c/len(arr):4.1f}%)")

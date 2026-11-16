@@ -120,7 +120,7 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
 - **Question fixed:** *Is the supervised "generalization" actually near-memorization?*
 - **Outcome:** **39%** of eval within Hamming ≤ 2 of training; **14 exact
   duplicates**; the 5 improvers only **[2,2,3,3,4]** from the nearest training
-  neighbour (CDR-H3 basis). On the corrected full-CDR basis this eases to **27%**
+  neighbour (CDR-H3 basis). On the corrected full-CDR basis this eases to **26.3%**
   within Hamming ≤ 2 and **0 exact duplicates** (Fig F1): near-duplication is real
   but was overstated by CDR-H3-only distance, and the net advantage inflation from
   leakage is ≈1.4×.

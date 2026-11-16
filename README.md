@@ -28,7 +28,7 @@ prior, and affinity maturation is not a germline-proximity problem.
 | | |
 |---|---|
 | **Problem** | Which antibody variants should a team synthesise next, given a few measured examples? |
-| **Data** | 1,266 trastuzumab CDR variants with SPR Kd (Absci); 36,391 CDR-H3 variants with FACS labels (Mason 2021); KyDab multi-target panel |
+| **Data** | 1,266 trastuzumab CDR variants with SPR Kd (Absci); 36,391 CDR-H3 variants with FACS labels (Mason 2021 — the zero-shot arm scores a 500-variant subsample, the fine-tuning arm uses all of it); KyDab multi-target panel |
 | **Methods compared** | mutation count, BLOSUM62, ESM-2 (650M), AbLang, AntiBERTy, AntiFold (inverse folding), ridge regression, LoRA fine-tuning |
 | **Statistics** | stratified bootstrap CIs, paired DeLong tests, partial correlation, tie-corrected Mann–Whitney, Bonferroni |
 | **Reusable output** | A 6-point evaluation protocol for vetting any affinity-ranking method |
@@ -54,8 +54,10 @@ rather than generalise. This benchmark separates both.
 Mutation count (MW p = 3.2×10⁻⁷) and BLOSUM62 (p = 1.9×10⁻³) significantly
 enrich improvers; the antibody PLMs do not. The PLMs are not broken — they
 encode a *different* prior. Its usefulness **flips with the task**: on Mason the
-same PLMs *enrich* binders (n = 154 binders of 500 variants; p ≈ 10⁻⁴), because
-binders there happen to be low-mutation.
+two *antibody* PLMs enrich binders (AbLang p = 1.6×10⁻⁴, AntiBERTy p = 2.6×10⁻⁴;
+n = 154 binders of a 500-variant subsample), because binders there happen to be
+low-mutation. General-purpose ESM-2 does not (p = 0.21) — the flip is a property
+of the germline prior, not of PLMs in general.
 
 <p align="center"><img src="figures/F2_zeroshot_two_prior.png" width="760" alt="Parent-distance baselines enrich improvers; PLMs do not"></p>
 
@@ -101,8 +103,8 @@ the counter — an earlier phrasing implied otherwise.*
 
 ### 4. Fine-tuning does not rescue it
 
-LoRA fine-tuning of ESM-2-650M on Mason binder classification does not beat
-one-hot baselines on the same split:
+LoRA fine-tuning of ESM-2-650M, on both datasets, against baselines fitted on
+the same splits. It never beats one-hot encoding of the same sequences:
 
 Every comparison is against the fine-tuned model, so the LoRA row itself is
 the reference — its own score is the ROC-AUC column.
@@ -132,6 +134,51 @@ one-hot features and loses to a 128-unit MLP on those same features. It does bea
 the mutation-count baseline, so supervision buys something — just not more than
 one-hot encoding does. Removing leakage costs every method and costs the PLM
 **most** (−0.062 vs −0.050), widening the MLP gap from −0.024 to −0.036.
+
+**Absci — HER2 SPR binder classification** (test n = 124 random / 123 distance):
+
+| method | random | distance |
+|---|---:|---:|
+| LR on mutation count | 0.658 | 0.645 |
+| LR on one-hot CDR-H3 | **0.943** | **0.939** |
+| ESM-2-650M + LoRA (r = 8) | 0.935 | 0.903 |
+| MLP(128) on one-hot | 0.931 | 0.924 |
+
+Same shape as Mason: LoRA beats mutation count (p = 9.6×10⁻⁹ / 7.3×10⁻⁶) and ties
+both one-hot models (p = 0.51 / 0.16 vs LR, p = 0.76 / 0.42 vs MLP). *Absci is the
+weaker of the two tests and is not independent confirmation of everything Mason
+shows:* its test set is 124 variants against Mason's 3,640, so standard errors are
+0.013–0.027 rather than 0.004–0.008. Mason's clearest result — the MLP beating
+LoRA by 0.024 at p = 1.4×10⁻⁹ — **would be undetectable at this n**.
+
+### Does fine-tuning fix the anti-prediction of improvers?
+
+The question the benchmark exists to ask, and a binder AUROC does not answer it —
+binder retrieval and improver retrieval are different tasks (finding 1). One
+held-out Absci split holds 2 strict and 7 near improvers, so the test is
+**cross-fitted**: 5 folds, every variant scored by a model that never saw it,
+putting all 42 near-improvers and all 5 strict improvers in play at once.
+
+| scorer | near-improver AUROC (n = 42) | strict (n = 5) |
+|---|---|---|
+| ESM-2 + LoRA, cross-fitted | 0.901 [0.849–0.939] | 0.905 [0.815–0.969] |
+| LR on one-hot, cross-fitted (same folds) | 0.901 [0.873–0.926] | 0.887 [0.799–0.961] |
+| mutation count | 0.724 [0.649–0.794] | 0.686 [0.457–0.905] |
+| ESM-2 zero-shot | 0.510 [0.430–0.594] | 0.313 [0.192–0.454] |
+| AbLang zero-shot | 0.451 [0.369–0.533] | 0.266 [0.135–0.417] |
+
+**Yes — and the PLM contributes nothing to the fix.** Supervision removes the
+anti-prediction outright: AbLang's 0.451, below chance, becomes 0.901. But the
+fine-tuned 650M-parameter model and a logistic regression on 260 one-hot features
+are indistinguishable — **Δ = −0.0001, p = 0.995** (paired DeLong, identical
+folds) — while both beat mutation count (Δ = +0.177, p = 6.8×10⁻⁷).
+
+What fixes improver ranking is **labels, not the pretrained representation**. The
+strict tier agrees in direction, but n = 5 and the intervals overlap heavily; it
+carries no claim on its own.
+
+Artifacts: `results/absci/absci_finetune_improver.csv` and `..._finetune_oof.csv`,
+via `training/finetune_cv.py` + `experiments/e5_finetune_improver.py`.
 
 *Caveat, stated rather than buried:* the distance-aware split shifts class balance
 (train 34.6% positive, test 16.4%), because binders are low-mutation and cluster
@@ -167,7 +214,7 @@ log is in `docs/validation_checklist.md`.
 - **Full-CDR basis.** The first analysis scored CDR-H3 only; Absci variants also
   vary in HCDR1/HCDR2. Re-ran on the complete 29-position basis. Conclusions held.
 - **Leakage overstated.** CDR-H3-only distance exaggerated near-duplication:
-  within-Hamming-≤2 overlap 39% → 27%, exact duplicates 14 → 0.
+  within-Hamming-≤2 overlap 39.1% → 26.3%, exact duplicates 14 → 0.
 - **A signal demoted — and the stated reason was itself wrong.** ESM-2's partial
   correlation is nominally anti-fitness (ρ = −0.111, p = 0.023, and −0.124,
   p = 0.011 controlling for full-CDR count instead). It does not survive
@@ -179,8 +226,8 @@ log is in `docs/validation_checklist.md`.
 - **Tie correction.** Strict-tier enrichment p rested on a score tie; midrank
   Mann–Whitney moved it 0.028 → 0.075. Now applied to every rank statistic.
 - **Mason flipped the thesis.** I expected the anti-ranking to replicate; instead
-  PLMs *enrich* binders there. The sign depends on the task — this became
-  load-bearing rather than a failed replication.
+  the antibody PLMs *enrich* binders there (ESM-2 does not). The sign depends on
+  the task — this became load-bearing rather than a failed replication.
 - **Testing differences, not intervals.** Per-model bootstrap CIs do not test a
   difference between two correlated AUCs; added a paired DeLong test
   (`evaluation/delong.py`).
@@ -234,14 +281,14 @@ LICENSE                   MIT (code and computed outputs only)
 models/         5  zero-shot scorers: BLOSUM62, ESM-2, AbLang, AntiBERTy
 evaluation/     7  metric libraries — improver retrieval, low-N protocol, DeLong,
                    partial Spearman, IMGT stratification, results-path resolver
-experiments/   21  drivers — e1* zero-shot · e2* few-shot + leakage · e4* structure,
+experiments/   22  drivers — e1* zero-shot · e2* few-shot + leakage · e4* structure,
                    plus kydab_eval (out-of-distribution) and extract_embeddings
 structures/     3  AntiFold fixed-backbone scoring on the 1N8Z crystal
-training/      10  LoRA fine-tuning, the leak-check / baseline comparison, a contract
+training/      15  LoRA fine-tuning, the leak-check / baseline comparison, a contract
                    test, and checkpoints/ (run config + logs only, never weights)
 scripts/        1  merge_fitness.py — restore stripped measured values
 data/           4  download + process Mason / Absci / KyDab (raw data not shipped)
-results/       45  computed scores + derived metrics, grouped by dataset
+results/       52  computed scores + derived metrics, grouped by dataset
 figures/        8  F1–F5, their two generators, and a caption index
 docs/           2  CODEMAP.md (every script) · validation_checklist.md (every claim)
 ```

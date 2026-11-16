@@ -70,7 +70,7 @@ considered and why one was taken. The ones referenced from published code are:
 | `experiments/e2f_distance_split.py` ▶ | Leave-cluster-out distance-aware split — the keystone validity check. Guarantees no near-duplicate leakage. | `absci_e2f_distance_d{1,2}.csv`, `absci_e2f_distance_d{1,2}_summary.csv` |
 | `experiments/e2g_distance_stratified.py` ✓ | Metric vs min-distance-to-train, seed-averaged — the correlation-vs-discovery reconciliation (Fig F4). Reports both Spearman ρ and near-AUROC per distance bin. | `absci_e2g_dist_stratified.csv` |
 | `experiments/e2h_cutoff_sensitivity.py` ✓ | Near-tier cutoff (5/10/20%) + censoring-floor sensitivity. | `absci_sensitivity.csv` |
-| `experiments/e2i_fullcdr_recheck.py` ✓ | Full-CDR (vs CDR-H3-only) re-run of leakage/curve — the foundational correction that moved leakage from 39%→27%. | `absci_fullcdr_recheck.csv` |
+| `experiments/e2i_fullcdr_recheck.py` ✓ | Full-CDR (vs CDR-H3-only) re-run of leakage/curve — the foundational correction that moved leakage from 39.1%→26.3%. | `absci_fullcdr_recheck.csv` |
 
 ## Structure arm — Q2 (`structures/`, `experiments/e4*`)
 
@@ -136,7 +136,7 @@ stratified split, an upper bound, not a distance-aware result.*
 
 | File | What it shows | Script |
 |---|---|---|
-| `F1_leakage.png` | Sequence-overlap leakage on the full-CDR basis (CDR-H3-only distance overstates: 39%→27% within Hamming ≤2, 14→0 exact duplicates). | `make_figures.py` |
+| `F1_leakage.png` | Sequence-overlap leakage on the full-CDR basis (CDR-H3-only distance overstates: 39.1%→26.3% within Hamming ≤2, 14→0 exact duplicates). | `make_figures.py` |
 | `F2_zeroshot_two_prior.png` | Two priors: parent-distance baselines enrich improvers; PLMs do not. Signed MW enrichment + near-AUROC. | `make_figures.py` |
 | `F3_structure_counting.png` | Fixed-backbone IF reduces to counting: raw ρ → partial ρ controlling for mutation count (AntiFold +0.135 → ≈0). | `make_figures.py` |
 | `F4_correlation_vs_discovery.png` | The advantage that generalizes (global ρ) is not the one that discovers (near-AUROC ≈ counting). | `make_figures.py` |

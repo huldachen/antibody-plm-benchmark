@@ -1,0 +1,5 @@
+dataset,seed,n_train,n_test,split_type,train_inter_test,median_nearest_train_hamming,frac_test_d_le_1,method,n_features,roc_auc,accuracy,mcc
+absci,42,992,123,distance_aware_d2,0,5.0,0.0,LR(MutCount),1,0.6444805194805194,0.7235772357723578,0.13390367734007458
+absci,42,992,123,distance_aware_d2,0,5.0,0.0,LR(one-hot),260,0.938961038961039,0.9186991869918699,0.7958313055623855
+absci,42,992,123,distance_aware_d2,0,5.0,0.0,MLP(128) one-hot,260,0.9240259740259741,0.9024390243902439,0.7544347433242687
+absci,42,992,123,distance_aware_d2,0,5.0,0.0,ESM-2 LoRA r=8 lr=0.0001 (absci_cls_r8_lr1e-4_e5_dist2),7724802,0.9025974025974026,0.8292682926829268,0.5522276673123163
