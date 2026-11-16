@@ -97,9 +97,13 @@ and reviewer-rebuttal reference. Grouped by theme; artifacts named where known.
   partial only together with the ρ(score, count) from the *same* control basis;
   mixing the two bases in one sentence yields arithmetic no reader can reconcile. AntiFold vs mutation count **ρ = −0.73** (−0.71 full-CDR). No —
   fixed-backbone IF is mechanistically a counter. ESM-2's partial ρ is *nominally*
-  anti on the CDR-H3 basis (−0.110, p = 0.023) but does **not** survive the full-CDR
-  re-scoring, so we do not rest the mechanism on it and lead instead with the
-  model-free two-prior divergence (Fig F2).
+  anti on the CDR-H3 basis (−0.111, p = 0.023), and remains so controlling for
+  full-CDR count instead (−0.124, p = 0.011). What it does **not** survive is
+  restriction to the 398 binders ESM-2 scores correctly — CDR-H3-only variants —
+  where it falls to **−0.057, p = 0.26**. The earlier wording here blamed
+  "full-CDR re-scoring"; that is the wrong reason and the signal is stronger on
+  that basis. We do not rest the mechanism on it either way, and lead instead with
+  the model-free two-prior divergence (Fig F2).
 - **Artifact:** `absci_e4_partial_corr.csv` (CDR-H3 basis),
   `absci_e4b_fullcdr.csv` (full-CDR basis; F3).
 

@@ -168,9 +168,14 @@ log is in `docs/validation_checklist.md`.
   vary in HCDR1/HCDR2. Re-ran on the complete 29-position basis. Conclusions held.
 - **Leakage overstated.** CDR-H3-only distance exaggerated near-duplication:
   within-Hamming-≤2 overlap 39% → 27%, exact duplicates 14 → 0.
-- **A signal demoted.** ESM-2's partial correlation was nominally anti-fitness on
-  the CDR-H3 basis (ρ = −0.11, p = 0.02) but did not survive full-CDR re-scoring.
-  Dropped.
+- **A signal demoted — and the stated reason was itself wrong.** ESM-2's partial
+  correlation is nominally anti-fitness (ρ = −0.111, p = 0.023, and −0.124,
+  p = 0.011 controlling for full-CDR count instead). It does not survive
+  restricting to the 398 binders ESM-2 actually scores correctly — variants that
+  vary in CDR-H3 only — where it falls to **ρ = −0.057, p = 0.26**. Until
+  2026-11-16 this README and the checklist attributed the demotion to "full-CDR
+  re-scoring", which is not what killed it; the signal is *stronger* on that
+  basis. Dropped on the provenance evidence, which is the evidence that applies.
 - **Tie correction.** Strict-tier enrichment p rested on a score tie; midrank
   Mann–Whitney moved it 0.028 → 0.075. Now applied to every rank statistic.
 - **Mason flipped the thesis.** I expected the anti-ranking to replicate; instead

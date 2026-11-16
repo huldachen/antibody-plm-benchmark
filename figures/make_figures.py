@@ -69,6 +69,7 @@ PROJECT_ROOT = _find_project_root(HERE)
 OUT_DIR = HERE          # overridden by --out-dir in main()
 sys.path.insert(0, PROJECT_ROOT)
 from evaluation.paths import result_path  # noqa: E402
+from evaluation.metrics import partial_spearman  # noqa: E402
 
 from experiments.absci_fewshot_common import one_hot, ridge_scorer  # noqa: E402
 from evaluation.improver_metrics import (  # noqa: E402
@@ -103,6 +104,13 @@ def _load():
     parent = float(df.loc[df["NumMutations"] == 0, "neg_log_Kd"].iloc[0])
     X_full = np.hstack([one_hot(df[c].values) for c in CDRS])
     L_full = sum(len(df[c].iloc[0]) for c in CDRS)
+    # Full-CDR Hamming from WT. F3 controls on BOTH bases, and the two counts are
+    # not interchangeable: AntiFold is scored on all 29 varying positions while
+    # NumMutations counts only HCDR3's 13.
+    def _ham(seq, wt):
+        seq = str(seq)
+        return sum(a != b for a, b in zip(seq, wt)) if len(seq) == len(wt) else 0
+    df["MutCount_full"] = sum(df[c].apply(lambda v: _ham(v, WT[c])) for c in CDRS)
     return df, fit, parent, X_full, L_full
 
 
@@ -182,39 +190,74 @@ def fig2_two_prior(df, fit, parent):
     plt.close(fig)
 
 
-def _partial(x, y, z):
-    rx, ry, rz = rankdata(x), rankdata(y), rankdata(z)
-    def r(a, b):
-        B = np.c_[np.ones_like(b), b]
-        return a - B @ np.linalg.lstsq(B, a, rcond=None)[0]
-    return pearsonr(r(rx, rz), r(ry, rz))[0]
-
-
 def fig3_structure(df):
+    """F3 — does a score survive controlling for mutation count, on either basis?
+
+    Two panels, one per control variable. The earlier single-panel version
+    controlled the full-CDR AntiFold score for the CDR-H3 count, mixing bases in
+    the same way the README text did, and stated "n.s." in the title without
+    showing it. Here each panel names its control, every partial carries its
+    p-value, and the one combination that is undefined is labelled rather than
+    plotted.
+    """
     b = df[df["neg_log_Kd"].notna()]
-    fitb, mut = b["neg_log_Kd"].values, b["NumMutations"].values.astype(float)
-    rows = [("MutCount", -b["NumMutations"].values), ("BLOSUM62", b["BLOSUM62_score"].values),
-            ("AntiFold\n(full-CDR)", b["antifold_fullcdr"].values), ("ESM-2", b["ESM2_score"].values)]
-    names, raw, part = [], [], []
-    for nm, s in rows:
-        names.append(nm); raw.append(spearmanr(s, fitb)[0]); part.append(_partial(s, fitb, mut))
-    y = np.arange(len(names))[::-1]
-    fig, ax = plt.subplots(figsize=(8.2, 4.6))
-    for yi, r_, p_ in zip(y, raw, part):
-        ax.plot([r_, p_], [yi, yi], color="0.7", lw=2, zorder=1)
-    ax.scatter(raw, y, s=90, color=BLUE, label="raw ρ (vs affinity)", zorder=3)
-    ax.scatter(part, y, s=90, facecolor="white", edgecolor=RED, linewidth=2,
-               label="partial ρ (control mutation count)", zorder=3)
-    ax.axvline(0, color="0.3", lw=1)
-    ax.set_yticks(y); ax.set_yticklabels(names, fontsize=10)
-    ax.set_xlabel("Spearman ρ with affinity (among binders, n=420)", fontsize=10.5)
-    ax.set_title("F3. Fixed-backbone inverse folding reduces to counting\n"
-                 "(raw correlation collapses to n.s. once mutation count is "
-                 "controlled)", fontsize=11, loc="left", weight="bold")
-    ax.legend(fontsize=9.5, frameon=False, loc="lower right")
-    ax.grid(alpha=0.25, axis="x")
-    for sp in ("top", "right"):
-        ax.spines[sp].set_visible(False)
+    fitb = b["neg_log_Kd"].values
+    scorers = [("MutCount", -b["NumMutations"].values),
+               ("BLOSUM62", b["BLOSUM62_score"].values),
+               ("AntiFold\n(full-CDR)", b["antifold_fullcdr"].values),
+               ("ESM-2", b["ESM2_score"].values)]
+    controls = [("full-CDR mutation count", b["MutCount_full"].values.astype(float),
+                 "the corrected 29-position basis"),
+                ("CDR-H3 mutation count", b["NumMutations"].values.astype(float),
+                 "the original 13-position basis")]
+
+    y = np.arange(len(scorers))[::-1]
+    fig, axes = plt.subplots(1, 2, figsize=(12.4, 4.8), sharey=True)
+    for ax, (cname, z, sub) in zip(axes, controls):
+        for yi, (nm, sc) in zip(y, scorers):
+            raw = spearmanr(sc, fitb)[0]
+            rho, pval = partial_spearman(sc, fitb, z)
+            ax.scatter([raw], [yi], s=90, color=BLUE, zorder=3,
+                       label="raw ρ" if yi == y[0] else None)
+            if not np.isfinite(rho):
+                # MutCount controlled for its own count: the residual is constant,
+                # so the statistic does not exist. The previous figure plotted this
+                # silently as a missing point.
+                ax.annotate("undefined — score is the control", (raw, yi),
+                            textcoords="offset points", xytext=(10, -3),
+                            fontsize=8.5, color=GREY, va="center")
+                continue
+            ax.plot([raw, rho], [yi, yi], color="0.7", lw=2, zorder=1)
+            ax.scatter([rho], [yi], s=90, facecolor="white", edgecolor=RED,
+                       linewidth=2, zorder=3,
+                       label="partial ρ" if yi == y[0] else None)
+            stars = ("***" if pval < 1e-3 else "**" if pval < 0.01
+                     else "*" if pval < 0.05 else "n.s.")
+            ax.annotate(f"{rho:+.3f} {stars}", (rho, yi), textcoords="offset points",
+                        xytext=(0, 11), ha="center", fontsize=8.5,
+                        color=("0.35" if stars == "n.s." else RED))
+        ax.axvline(0, color="0.3", lw=1)
+        ax.set_title(f"control: {cname}\n({sub})", fontsize=10, loc="left")
+        ax.set_xlabel("Spearman ρ with affinity", fontsize=10)
+        ax.grid(alpha=0.25, axis="x")
+        ax.set_xlim(-0.33, 0.30)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+    axes[0].set_yticks(y)
+    axes[0].set_yticklabels([n for n, _ in scorers], fontsize=10)
+    axes[0].legend(fontsize=9.5, frameon=False, loc="lower right")
+    fig.suptitle("F3. Fixed-backbone inverse folding reduces to counting — "
+                 "AntiFold's raw ρ = +0.135 is not significant under either control "
+                 "(binders, n = 420)",
+                 fontsize=11, weight="bold", x=0.012, ha="left", y=1.015)
+    # ESM-2 IS significant in both panels; the reason it is not rested upon is
+    # provenance, not basis, and a reader comparing this figure to "A signal
+    # demoted" would otherwise see a contradiction.
+    fig.text(0.012, -0.045,
+             "ESM-2's partial is nominally significant under both controls, but does not survive "
+             "restriction to the 398 binders it scores exactly\n(CDR-H3-only variants): "
+             "ρ = −0.057, p = 0.26. The demotion is a provenance result, not a basis result.",
+             fontsize=8.5, color="0.35", ha="left")
     fig.tight_layout()
     _save(fig, "F3_structure_counting.png")
     plt.close(fig)
